@@ -56,6 +56,8 @@ export function clientLoader() {
 }
 
 export default function Home() {
+  const { data: authData } = authClient.useSession();
+
   const {
     addRun,
     systemPrompt,
@@ -81,6 +83,8 @@ export default function Home() {
   const isLoading = conversations.some((conv) => conv.isLoading);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  console.log(authData);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -174,6 +178,20 @@ export default function Home() {
             </Link>{" "}
             — AI Playground
           </p>
+
+          {authData ? (
+            <p className="text-sm font-medium text-muted-foreground">
+              [{authData.user.name ?? authData.user.email}] —{" "}
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0 h-auto"
+                onClick={() => authClient.signOut()}
+              >
+                Logout
+              </Button>
+            </p>
+          ) : null}
         </div>
 
         <div className="flex flex-row items-center justify-end gap-2">
@@ -428,12 +446,15 @@ function AuthDialog() {
     try {
       setIsLoggingIn(true);
 
-      await authClient.signIn.social({
+      const response = await authClient.signIn.social({
         provider: "google",
-        callbackURL: "/",
       });
 
-      toast.success("Login successful!");
+      if (response.error) {
+        throw new Error(response.error.message, {
+          cause: response.error,
+        });
+      }
     } catch (error) {
       console.error("Login failed:", error);
       toast.error("Login failed. Please try again.");
@@ -461,8 +482,6 @@ function AuthDialog() {
         <div className="flex flex-col items-center justify-center gap-4 py-4">
           {isAuthCheckPending || isLoggingIn ? (
             <div className="flex flex-col items-center gap-2">
-              {/* Replace with your loading spinner component */}
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
               <p className="text-sm text-muted-foreground">Please wait...</p>
             </div>
           ) : !authData ? (
