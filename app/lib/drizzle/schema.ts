@@ -1,4 +1,11 @@
-import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  jsonb,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -61,3 +68,27 @@ export const verification = pgTable("verification", {
 
 export type Verification = typeof verification.$inferSelect;
 export type NewVerification = typeof verification.$inferInsert;
+
+export const log = pgTable("log", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id),
+  request: jsonb("request")
+    .$type<{
+      provider: string;
+      model: string;
+      params: Record<string, unknown>;
+    }>()
+    .notNull(),
+  response: jsonb("response")
+    .$type<{
+      text: string;
+      meta: Record<string, unknown>;
+    }>()
+    .notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Log = typeof log.$inferSelect;
+export type NewLog = typeof log.$inferInsert;

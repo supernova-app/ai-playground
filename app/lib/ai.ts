@@ -1,4 +1,8 @@
-import { experimental_createProviderRegistry as createProviderRegistry } from "ai";
+import {
+  experimental_createProviderRegistry as createProviderRegistry,
+  type Experimental_LanguageModelV1Middleware as LanguageModelV1Middleware,
+  type LanguageModelV1StreamPart,
+} from "ai";
 
 import type { SUPPORTED_PROVIDER_KEY } from "~/config/ai";
 
@@ -7,6 +11,8 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createAzure } from "@ai-sdk/azure";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createVertex } from "@ai-sdk/google-vertex";
+
+import { db, schema } from "./drizzle";
 
 export const providerRegistry = createProviderRegistry({
   ...(process.env.AI_OPENAI_API_KEY
@@ -63,3 +69,81 @@ export const providerRegistry = createProviderRegistry({
       }
     : {}),
 } satisfies Partial<Record<SUPPORTED_PROVIDER_KEY, unknown>>);
+
+export const logMiddleware: LanguageModelV1Middleware = {
+  wrapGenerate: async ({ model, params, doGenerate }) => {
+    const logRequest = {
+      provider: model.provider,
+      model: model.modelId,
+      params,
+    };
+
+    const result = await doGenerate();
+
+    const logResponse = {
+      text: result.text!,
+      meta: {
+        finishReason: result.finishReason,
+        usage: result.usage,
+        providerMetadata: result.providerMetadata,
+      },
+    };
+
+    await db.insert(schema.log).values([
+      {
+        userId: params.headers!["user-id"]!,
+        request: logRequest,
+        response: logResponse,
+      },
+    ]);
+
+    return result;
+  },
+
+  wrapStream: async ({ model, params, doStream }) => {
+    const logRequest = {
+      provider: model.provider,
+      model: model.modelId,
+      params,
+    };
+
+    const { stream, ...rest } = await doStream();
+
+    const logResponse = {
+      text: "",
+      meta: null as any,
+    };
+
+    const transformStream = new TransformStream<
+      LanguageModelV1StreamPart,
+      LanguageModelV1StreamPart
+    >({
+      transform(chunk, controller) {
+        if (chunk.type === "text-delta") {
+          logResponse.text += chunk.textDelta;
+        }
+
+        if (chunk.type === "finish") {
+          logResponse.meta = chunk;
+        }
+
+        controller.enqueue(chunk);
+      },
+
+      async flush() {
+        await db.insert(schema.log).values([
+          {
+            userId: params.headers!["user-id"]!,
+            request: logRequest,
+            response: logResponse,
+          },
+        ]);
+      },
+    });
+
+    return {
+      stream: stream.pipeThrough(transformStream),
+      ...rest,
+    };
+  },
+};

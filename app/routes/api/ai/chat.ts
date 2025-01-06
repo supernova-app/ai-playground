@@ -6,10 +6,13 @@ import {
   SUPPORTED_PROVIDER_KEYS,
 } from "~/config/ai";
 
-import { streamText } from "ai";
+import {
+  streamText,
+  experimental_wrapLanguageModel as wrapLanguageModel,
+} from "ai";
 
 import { z } from "zod";
-import { providerRegistry } from "~/lib/ai";
+import { logMiddleware, providerRegistry } from "~/lib/ai";
 import { auth } from "~/lib/auth.server";
 
 export const maxDuration = 30;
@@ -59,12 +62,19 @@ export async function action({ request }: Route.ActionArgs) {
   const modelId = `${payload.provider}:${payload.model}`;
 
   const result = streamText({
-    model: providerRegistry.languageModel(modelId),
+    model: wrapLanguageModel({
+      model: providerRegistry.languageModel(modelId),
+      middleware: logMiddleware,
+    }),
 
     messages: payload.messages,
 
     temperature: payload.temperature,
     maxTokens: payload.max_tokens,
+
+    headers: {
+      "user-id": session.user.id,
+    },
   });
 
   return result.toDataStreamResponse();

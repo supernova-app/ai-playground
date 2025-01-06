@@ -84,8 +84,6 @@ export default function Home() {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  console.log(authData);
-
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
