@@ -22,6 +22,7 @@ export const providerRegistry = createProviderRegistry({
           apiKey: process.env.AI_OPENAI_API_KEY,
           organization: process.env.AI_OPENAI_ORGANIZATION,
           project: process.env.AI_OPENAI_PROJECT,
+          compatibility: "strict",
         }),
       }
     : {}),
