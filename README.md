@@ -6,7 +6,7 @@ Multi-model prompt evaluation tool used internally at Supernova AI. We built thi
 
 ## What it does
 
-- Tests prompts across multiple AI models simultaneously (OpenAI, Anthropic, and more)
+- Tests prompts across multiple AI models simultaneously (OpenAI, Anthropic, Azure, Google Generative AI, VertexAI, and more)
 - Shows responses side-by-side for easy comparison
 - Stores system prompts and variables separately
 - Saves test cases for future testing
@@ -60,4 +60,4 @@ pnpm dev
 
 ## License
 
-MIT. Use it however you want.
+MIT
