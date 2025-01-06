@@ -10,7 +10,7 @@ import {
 } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
 import { useChat } from "ai/react";
-import { ClipboardCopy, Trash } from "lucide-react";
+import { ClipboardCopy, Copy, Trash } from "lucide-react";
 import { toast } from "sonner";
 
 import { useConversation, usePlaygroundStore } from "~/contexts/store";
@@ -41,6 +41,7 @@ export function Conversation({ id }: ConversationProps) {
     removeMessage,
     updateMessage,
     addTestCase,
+    duplicateConversation,
     conversations,
   } = usePlaygroundStore();
 
@@ -194,6 +195,17 @@ export function Conversation({ id }: ConversationProps) {
             }
           >
             Save TC
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => {
+              duplicateConversation(id);
+              toast.success("Conversation duplicated successfully");
+            }}
+            title="Duplicate conversation"
+          >
+            <Copy className="h-4 w-4" />
           </Button>
           <Button
             variant="destructive"

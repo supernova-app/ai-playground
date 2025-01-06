@@ -48,6 +48,7 @@ type PlaygroundStore = {
   addConversation: () => void;
   removeConversation: (id: string) => void;
   updateConversation: (id: string, conversation: Partial<Conversation>) => void;
+  duplicateConversation: (id: string) => void;
 
   addMessage: (conversationId: string, message: Message) => void;
   removeMessage: (conversationId: string, messageId: string) => void;
@@ -146,6 +147,34 @@ export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
         conv.id === id ? { ...conv, ...conversation } : conv
       ),
     })),
+  duplicateConversation: (id: string) =>
+    set((state) => {
+      const conversationToDuplicate = state.conversations.find(
+        (conv) => conv.id === id
+      );
+      if (!conversationToDuplicate) return state;
+
+      // Generate new unique IDs for the duplicated messages
+      const duplicatedMessages = conversationToDuplicate.messages.map(
+        (message) => ({
+          ...message,
+          id: Date.now().toString(),
+        })
+      );
+
+      return {
+        conversations: [
+          ...state.conversations,
+          {
+            ...conversationToDuplicate,
+            id: Date.now().toString(),
+            messages: duplicatedMessages,
+            createdAt: new Date(),
+            isLoading: false,
+          },
+        ],
+      };
+    }),
 
   addMessage: (conversationId: string, message: Message) =>
     set((state) => ({

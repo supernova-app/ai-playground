@@ -330,7 +330,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="flex flex-row items-stretch justify-start gap-4 mt-2">
+        <div className="flex flex-row items-stretch justify-start gap-4 mt-2 overflow-x-auto">
           {conversations.map((conversation) => (
             <Conversation key={conversation.id} id={conversation.id} />
           ))}
