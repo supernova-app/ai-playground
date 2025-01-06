@@ -157,7 +157,7 @@ export default function Home() {
 
   return (
     <div className="flex h-screen w-full flex-col items-stretch justify-start">
-      {/* <AuthDialog /> */}
+      <AuthDialog />
 
       <div className="flex flex-row items-center justify-between gap-2 p-4">
         <div className="flex flex-row items-center justify-start gap-2">

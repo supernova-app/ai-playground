@@ -25,18 +25,18 @@ const payloadSchema = z.object({
 });
 
 export async function action({ request }: Route.ActionArgs) {
-  // const session = await auth.api.getSession({
-  //   headers: request.headers,
-  // });
+  const session = await auth.api.getSession({
+    headers: request.headers,
+  });
 
-  // if (!session) {
-  //   return Response.json(
-  //     { error: "Unauthorized" },
-  //     {
-  //       status: 401,
-  //     }
-  //   );
-  // }
+  if (!session) {
+    return Response.json(
+      { error: "Unauthorized" },
+      {
+        status: 401,
+      }
+    );
+  }
 
   const jsonBody = await request.json();
   const payloadParseResult = payloadSchema.safeParse(jsonBody);
