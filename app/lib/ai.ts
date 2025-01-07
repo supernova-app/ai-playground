@@ -12,7 +12,7 @@ import { createAzure } from "@ai-sdk/azure";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createVertex } from "@ai-sdk/google-vertex";
 
-import { db, schema } from "./drizzle";
+import { db, schema } from "./db";
 
 export const providerRegistry = createProviderRegistry({
   ...(process.env.AI_OPENAI_API_KEY
