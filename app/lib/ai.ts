@@ -90,7 +90,7 @@ export const logMiddleware: LanguageModelV1Middleware = {
       },
     };
 
-    await db.insert(schema.log).values([
+    await db.insert(schema.llmLog).values([
       {
         userId: params.headers!["user-id"]!,
         request: logRequest,
@@ -132,7 +132,7 @@ export const logMiddleware: LanguageModelV1Middleware = {
       },
 
       async flush() {
-        await db.insert(schema.log).values([
+        await db.insert(schema.llmLog).values([
           {
             userId: params.headers!["user-id"]!,
             request: logRequest,

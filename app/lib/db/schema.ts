@@ -69,7 +69,7 @@ export const verification = pgTable("verification", {
 export type Verification = typeof verification.$inferSelect;
 export type NewVerification = typeof verification.$inferInsert;
 
-export const log = pgTable("log", {
+export const llmLog = pgTable("llm_log", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: text("user_id")
     .notNull()
@@ -90,5 +90,5 @@ export const log = pgTable("log", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export type Log = typeof log.$inferSelect;
-export type NewLog = typeof log.$inferInsert;
+export type Log = typeof llmLog.$inferSelect;
+export type NewLog = typeof llmLog.$inferInsert;
