@@ -15,6 +15,13 @@
       "when": 1736171285253,
       "tag": "0001_charming_zarek",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1736256323422,
+      "tag": "0002_chunky_microbe",
+      "breakpoints": true
     }
   ]
 }
