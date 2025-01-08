@@ -69,7 +69,7 @@ export const verification = pgTable("verification", {
 export type Verification = typeof verification.$inferSelect;
 export type NewVerification = typeof verification.$inferInsert;
 
-export const llmLog = pgTable("llm_log", {
+export const llmLog = pgTable("llm_logs", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: text("user_id")
     .notNull()
