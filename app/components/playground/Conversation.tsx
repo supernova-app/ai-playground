@@ -215,6 +215,7 @@ export function Conversation({ id }: ConversationProps) {
             size="icon"
             onClick={() => removeConversation(id)}
             disabled={conversations.length < 2}
+            title="Remove Conversation"
           >
             <Trash className="h-4 w-4" />
           </Button>

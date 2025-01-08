@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { cn } from "~/lib/utils";
 import {
   Accordion,
   AccordionContent,
@@ -29,7 +30,13 @@ import {
 } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Textarea } from "~/components/ui/textarea";
-import { ListRestart, Plus, Settings } from "lucide-react";
+import {
+  ListRestart,
+  Plus,
+  Settings,
+  Maximize2,
+  Minimize2,
+} from "lucide-react";
 import { usePlaygroundStore } from "~/contexts/store";
 import { Conversation } from "~/components/playground/Conversation";
 import { roles, type Message } from "~/config/ai";
@@ -148,6 +155,34 @@ export default function Home() {
     linkElement.click();
   };
 
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!editorContainerRef.current) return;
+
+    try {
+      if (!isFullscreen) {
+        await editorContainerRef.current.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (error) {
+      console.error("Fullscreen error:", error);
+    }
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement !== null);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
   useEffect(() => {
     document.querySelectorAll(".message-textarea").forEach((textarea) => {
       (textarea as HTMLTextAreaElement).style.height = "auto";
@@ -236,12 +271,17 @@ export default function Home() {
               )}
             </DialogContent>
           </Dialog>
-          <Button onClick={handleClearChat} variant="destructive" size="icon">
+          <Button
+            onClick={handleClearChat}
+            variant="destructive"
+            size="icon"
+            title="Clear All"
+          >
             <ListRestart className="h-4 w-4" />
           </Button>
           <Popover>
             <PopoverTrigger asChild>
-              <Button size="icon" variant="secondary">
+              <Button size="icon" variant="secondary" title="Settings">
                 <Settings className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
@@ -288,7 +328,11 @@ export default function Home() {
               </div>
             </PopoverContent>
           </Popover>
-          <Button onClick={addConversation} size="icon">
+          <Button
+            onClick={addConversation}
+            size="icon"
+            title="New Conversation"
+          >
             <Plus className="h-4 w-4" />
           </Button>
         </div>
@@ -296,11 +340,34 @@ export default function Home() {
 
       <main className="flex-1 gap-4 overflow-auto p-4 pt-0">
         <div className="grid gap-2 sticky top-0 bg-background z-10">
-          <Label htmlFor="system-prompt">System Prompt</Label>
+          <div className="flex flex-row items-center justify-between">
+            <Label htmlFor="system-prompt">System Prompt</Label>
+            <span className="scale-75">⌘+⇧+P</span>
+          </div>
 
-          <div className="min-h-32 resize-y overflow-y-auto">
+          <div
+            className="relative group min-h-32 max-h-[50vh] resize-y overflow-y-auto"
+            ref={editorContainerRef}
+          >
+            <Button
+              size="icon"
+              variant="ghost"
+              className="absolute right-2 top-2 opacity-50 group-hover:opacity-100 transition-opacity z-10"
+              onClick={toggleFullscreen}
+              title="Toggle Fullscreen"
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-4 w-4" />
+              ) : (
+                <Maximize2 className="h-4 w-4" />
+              )}
+            </Button>
+
             <Editor
-              className="h-full border overflow-y-auto"
+              className={cn("h-full border overflow-y-auto", {
+                "!fixed !inset-0 !z-50 !h-screen !w-screen !border-none":
+                  isFullscreen,
+              })}
               defaultValue={systemPrompt}
               language="html"
               onChange={(value) => setSystemPrompt(value || "")}
@@ -320,6 +387,22 @@ export default function Home() {
                 minimap: { enabled: false },
                 dragAndDrop: true,
                 automaticLayout: true,
+                autoDetectHighContrast: false,
+              }}
+              onMount={(editor, monaco) => {
+                // Add command palette keyboard binding
+                editor.addCommand(
+                  monaco.KeyMod.CtrlCmd |
+                    monaco.KeyMod.Shift |
+                    monaco.KeyCode.KeyP,
+                  () => {
+                    editor.trigger(
+                      "keyboard",
+                      "editor.action.quickCommand",
+                      null
+                    );
+                  }
+                );
               }}
             />
           </div>
