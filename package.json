@@ -3,9 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "cross-env NODE_ENV=production react-router build",
-    "dev": "react-router dev",
-    "start": "cross-env NODE_ENV=production react-router-serve ./build/server/index.js",
+    "build": "cross-env NODE_ENV=production react-router build && node vercel/prepare.js",
+    "dev": "cross-env NODE_ENV=development node ./dev-server.js",
     "typecheck": "react-router typegen && tsc",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
@@ -45,8 +44,10 @@
     "@radix-ui/react-toggle": "^1.1.1",
     "@radix-ui/react-toggle-group": "^1.1.1",
     "@radix-ui/react-tooltip": "^1.1.6",
+    "@react-router/express": "^7.1.1",
     "@react-router/node": "^7.1.1",
     "@react-router/serve": "^7.1.1",
+    "@vercel/node": "^5.0.2",
     "ai": "^4.0.26",
     "better-auth": "^1.1.10",
     "class-variance-authority": "^0.7.1",
@@ -56,6 +57,7 @@
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.3",
     "embla-carousel-react": "^8.5.1",
+    "express": "^4.21.2",
     "input-otp": "^1.4.1",
     "isbot": "^5.1.19",
     "lucide-react": "^0.469.0",
@@ -78,6 +80,7 @@
   },
   "devDependencies": {
     "@react-router/dev": "^7.1.1",
+    "@types/express": "^5.0.0",
     "@types/node": "^20.17.11",
     "@types/pg": "^8.11.10",
     "@types/react": "^19.0.2",
