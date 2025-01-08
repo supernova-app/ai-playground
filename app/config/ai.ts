@@ -3,9 +3,7 @@ import { z } from "zod";
 export const SUPPORTED_PROVIDER_KEYS = [
   "openai",
   "anthropic",
-  "azure",
   "google",
-  "vertex",
 ] as const;
 export type SUPPORTED_PROVIDER_KEY = (typeof SUPPORTED_PROVIDER_KEYS)[number];
 
@@ -106,7 +104,5 @@ export const modelSuggestions = {
     "claude-3-5-haiku-20241022",
     "claude-3-haiku-20240307",
   ],
-  azure: [],
-  google: [],
-  vertex: [],
+  google: ["gemini-2.0-flash-exp", "gemini-1.5-flash", "gemini-1.5-pro"],
 } satisfies Record<SUPPORTED_PROVIDER_KEY, string[]>;

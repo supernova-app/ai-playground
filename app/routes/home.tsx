@@ -394,7 +394,7 @@ export default function Home() {
 
               <Button type="submit" size="sm" className="ml-2 gap-1.5">
                 <span>Send</span>
-                <span className="scale-75">⌘+k</span>
+                <span className="scale-75">⌘+⏎</span>
               </Button>
             </div>
           </fieldset>

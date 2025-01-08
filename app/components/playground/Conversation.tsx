@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
+import { Skeleton } from "~/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -119,7 +120,9 @@ export function Conversation({ id }: ConversationProps) {
       key={id}
       className={cn(
         "flex min-h-[75vh] flex-1 flex-col rounded-lg p-4 border-4",
-        seededRandomBackground(id)
+        seededRandomBackground(
+          currentConversation.provider + ":" + currentConversation.model
+        )
       )}
     >
       <div className="flex flex-row items-center justify-between">
@@ -295,6 +298,19 @@ export function Conversation({ id }: ConversationProps) {
             </div>
           </div>
         ))}
+
+        {currentConversation.isLoading ? (
+          <div className="flex flex-row items-end gap-2">
+            <div className="flex basis-3/4 flex-col items-stretch justify-start gap-2">
+              <Skeleton className="h-8 w-20 rounded" />
+              <Skeleton className="h-24 w-full rounded-lg" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Skeleton className="h-9 w-9 rounded" />
+              <Skeleton className="h-9 w-9 rounded" />
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
