@@ -163,12 +163,7 @@ export default function Home() {
 
       <div className="flex flex-row items-center justify-between gap-2 p-4">
         <div className="flex flex-row items-center justify-start gap-2">
-          <img
-            src="/public/logo.svg"
-            alt="Supernova AI Logo"
-            width={24}
-            height={24}
-          />
+          <img src="/logo.svg" alt="Supernova AI Logo" width={24} height={24} />
 
           <p className="text-xl/none font-semibold text-primary">
             <Link
