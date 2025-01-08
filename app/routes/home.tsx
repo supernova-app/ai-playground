@@ -349,7 +349,7 @@ export default function Home() {
             className="relative group min-h-32 max-h-[50vh] resize-y overflow-y-auto"
             ref={editorContainerRef}
           >
-            <Button
+            {/* <Button
               size="icon"
               variant="ghost"
               className="absolute right-2 top-2 opacity-50 group-hover:opacity-100 transition-opacity z-10"
@@ -361,7 +361,7 @@ export default function Home() {
               ) : (
                 <Maximize2 className="h-4 w-4" />
               )}
-            </Button>
+            </Button> */}
 
             <Editor
               className={cn("h-full border overflow-y-auto", {
