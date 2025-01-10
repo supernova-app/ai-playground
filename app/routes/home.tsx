@@ -9,7 +9,9 @@ import {
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -228,6 +230,15 @@ export default function Home() {
         </div>
 
         <div className="flex flex-row items-center justify-end gap-2">
+          <Button
+            onClick={handleClearChat}
+            variant="destructive"
+            size="icon"
+            title="Clear All"
+          >
+            <ListRestart className="h-4 w-4" />
+          </Button>
+
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline">Test Cases</Button>
@@ -271,14 +282,6 @@ export default function Home() {
               )}
             </DialogContent>
           </Dialog>
-          <Button
-            onClick={handleClearChat}
-            variant="destructive"
-            size="icon"
-            title="Clear All"
-          >
-            <ListRestart className="h-4 w-4" />
-          </Button>
           <Popover>
             <PopoverTrigger asChild>
               <Button size="icon" variant="secondary" title="Settings">
@@ -495,12 +498,13 @@ function UpdateVariableDialog({ name }: VariableInputProps) {
   const { systemPromptVars, updateSystemPromptVar } = usePlaygroundStore();
 
   return (
-    <DialogContent>
+    <DialogContent className="">
       <DialogHeader>
         <DialogTitle>
           Update Variable <code>{name}</code>
         </DialogTitle>
       </DialogHeader>
+
       <div className="grid gap-2">
         <Textarea
           value={systemPromptVars[name]}
@@ -508,6 +512,12 @@ function UpdateVariableDialog({ name }: VariableInputProps) {
           rows={10}
         />
       </div>
+
+      <DialogFooter>
+        <DialogClose asChild>
+          <Button>Ok</Button>
+        </DialogClose>
+      </DialogFooter>
     </DialogContent>
   );
 }
