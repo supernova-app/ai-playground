@@ -227,6 +227,15 @@ export default function Home() {
               </Button>
             </p>
           ) : null}
+
+          <Link
+            to="/privacy"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            target="_blank"
+            rel="noreferrer"
+          >
+            (Privacy Policy)
+          </Link>
         </div>
 
         <div className="flex flex-row items-center justify-end gap-2">
@@ -586,6 +595,17 @@ function AuthDialog() {
               Authentication error. Please try again.
             </p>
           ) : null}
+        </div>
+
+        <div className="flex flex-row items-center justify-center">
+          <Link
+            to="/privacy"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Privacy Policy
+          </Link>
         </div>
       </DialogContent>
     </Dialog>

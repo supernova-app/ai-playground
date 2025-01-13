@@ -80,6 +80,7 @@
   },
   "devDependencies": {
     "@react-router/dev": "^7.1.1",
+    "@tailwindcss/typography": "^0.5.16",
     "@types/express": "^5.0.0",
     "@types/node": "^20.17.11",
     "@types/pg": "^8.11.10",
