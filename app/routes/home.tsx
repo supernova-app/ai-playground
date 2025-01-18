@@ -38,6 +38,10 @@ import {
   Settings,
   Maximize2,
   Minimize2,
+  Zap,
+  Archive,
+  Variable,
+  Code,
 } from "lucide-react";
 import { usePlaygroundStore } from "~/contexts/store";
 import { Conversation } from "~/components/playground/Conversation";
@@ -530,6 +534,7 @@ function UpdateVariableDialog({ name }: VariableInputProps) {
     </DialogContent>
   );
 }
+
 function AuthDialog() {
   const {
     data: authData,
@@ -566,46 +571,143 @@ function AuthDialog() {
   return (
     <Dialog open={shouldShowDialog} modal>
       <DialogContent
-        className="sm:max-w-md"
+        className="sm:max-w-2xl"
         onPointerDownOutside={(e) => e.preventDefault()}
       >
-        <DialogHeader>
-          <DialogTitle className="text-center">
-            {isAuthCheckPending
-              ? "Checking authentication..."
-              : isLoggingIn
-              ? "Logging in..."
-              : "Please Authenticate"}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="flex flex-col items-center justify-center gap-4 py-4">
-          {isAuthCheckPending || isLoggingIn ? (
-            <div className="flex flex-col items-center gap-2">
-              <p className="text-sm text-muted-foreground">Please wait...</p>
+        <div className="flex flex-col items-center space-y-8 p-4">
+          {/* Logo & Title */}
+          <div className="flex flex-col items-center space-y-2">
+            <div className="flex items-center gap-3">
+              <img
+                src="/logo.svg"
+                alt="Supernova AI Logo"
+                width={40}
+                height={40}
+              />
+              <h1 className="text-2xl font-bold">Supernova AI Playground</h1>
             </div>
-          ) : !authData ? (
-            <Button onClick={handleGoogleLogin} className="w-full max-w-sm">
-              Login with Google
-            </Button>
-          ) : null}
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                Open Source
+              </span>
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                Free to Use
+              </span>
+            </div>
+          </div>
 
-          {authError ? (
-            <p className="text-sm text-destructive">
-              Authentication error. Please try again.
+          {/* Main Content */}
+          <div className="text-center space-y-2">
+            <h2 className="text-xl font-semibold">
+              Test Your Prompts Across Multiple AI Models
+            </h2>
+            <p className="text-muted-foreground max-w-lg">
+              Compare responses from different AI models side-by-side, store
+              test cases, and iterate on your prompts faster with our open
+              source playground.
             </p>
-          ) : null}
-        </div>
 
-        <div className="flex flex-row items-center justify-center">
-          <Link
-            to="/privacy"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Privacy Policy
-          </Link>
+            {/* Key Features */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left max-w-lg mx-auto !mt-8">
+              <div className="flex items-start gap-2">
+                <div className="rounded-full p-2 bg-primary/10">
+                  <Zap className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-medium">Side-by-Side Testing</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Compare responses from multiple models simultaneously
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="rounded-full p-2 bg-primary/10">
+                  <Archive className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-medium">Test Case Storage</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Save and reuse your test scenarios
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="rounded-full p-2 bg-primary/10">
+                  <Variable className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-medium">Variable System Prompts</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Test different system prompts easily
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="rounded-full p-2 bg-primary/10">
+                  <Code className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-medium">Developer Friendly</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Built for developers, by developers
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Auth Section */}
+          <div className="w-full max-w-sm space-y-4">
+            {isAuthCheckPending || isLoggingIn ? (
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-sm text-muted-foreground animate-pulse">
+                  {isAuthCheckPending
+                    ? "Checking authentication..."
+                    : "Logging in..."}
+                </p>
+              </div>
+            ) : !authData ? (
+              <Button
+                onClick={handleGoogleLogin}
+                className="w-full"
+                variant="default"
+                size="lg"
+              >
+                <img
+                  height="24"
+                  width="24"
+                  src="https://cdn.simpleicons.org/google/fff"
+                />
+                Continue with Google
+              </Button>
+            ) : null}
+
+            {authError && (
+              <p className="text-sm text-destructive text-center">
+                Authentication error. Please try again.
+              </p>
+            )}
+          </div>
+
+          {/* Footer Links */}
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <Link
+              to="/privacy"
+              className="hover:text-foreground transition-colors"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Privacy Policy
+            </Link>
+            <Link
+              to="https://github.com/supernova-app/ai-playground"
+              className="hover:text-foreground transition-colors"
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub Repository
+            </Link>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
