@@ -102,7 +102,7 @@ export default function Home() {
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = `${Math.min(
         textareaRef.current.scrollHeight,
-        window.innerHeight * 0.2
+        window.innerHeight * 0.2,
       )}px`;
     }
   }, [inputMessage]);
@@ -123,7 +123,7 @@ export default function Home() {
         conversations.map((conversation) => ({
           ...conversation,
           messages: [...conversation.messages, newMessage],
-        }))
+        })),
       );
 
       addRun();
@@ -137,7 +137,7 @@ export default function Home() {
 
   const handleClearChat = () => {
     setConversations(
-      conversations.map((conversation) => ({ ...conversation, messages: [] }))
+      conversations.map((conversation) => ({ ...conversation, messages: [] })),
     );
   };
 
@@ -151,7 +151,7 @@ export default function Home() {
   const handleDownloadTestCases = () => {
     const dataStr = JSON.stringify(testCases, null, 2);
     const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(
-      dataStr
+      dataStr,
     )}`;
     const exportFileDefaultName = "test-cases.json";
 
@@ -192,9 +192,8 @@ export default function Home() {
   useEffect(() => {
     document.querySelectorAll(".message-textarea").forEach((textarea) => {
       (textarea as HTMLTextAreaElement).style.height = "auto";
-      (
-        textarea as HTMLTextAreaElement
-      ).style.height = `${textarea.scrollHeight}px`;
+      (textarea as HTMLTextAreaElement).style.height =
+        `${textarea.scrollHeight}px`;
     });
   }, [conversations]);
 
@@ -415,9 +414,9 @@ export default function Home() {
                     editor.trigger(
                       "keyboard",
                       "editor.action.quickCommand",
-                      null
+                      null,
                     );
-                  }
+                  },
                 );
               }}
             />
@@ -569,11 +568,8 @@ function AuthDialog() {
   }
 
   return (
-    <Dialog open={shouldShowDialog} modal>
-      <DialogContent
-        className="sm:max-w-2xl"
-        onPointerDownOutside={(e) => e.preventDefault()}
-      >
+    <Dialog open={shouldShowDialog}>
+      <DialogContent className="max-w-4xl max-h-[95vh] overflow-auto">
         <div className="flex flex-col items-center space-y-8 p-4">
           {/* Logo & Title */}
           <div className="flex flex-col items-center space-y-2">
@@ -594,6 +590,59 @@ function AuthDialog() {
                 Free to Use
               </span>
             </div>
+          </div>
+
+          {/* Auth Section */}
+          <div className="w-full max-w-sm space-y-4">
+            {isAuthCheckPending || isLoggingIn ? (
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-sm text-muted-foreground animate-pulse">
+                  {isAuthCheckPending
+                    ? "Checking authentication..."
+                    : "Logging in..."}
+                </p>
+              </div>
+            ) : !authData ? (
+              <Button
+                onClick={handleGoogleLogin}
+                className="w-full"
+                variant="default"
+                size="lg"
+              >
+                <img
+                  height="24"
+                  width="24"
+                  src="https://cdn.simpleicons.org/google/fff"
+                />
+                Continue with Google
+              </Button>
+            ) : null}
+
+            {authError && (
+              <p className="text-sm text-destructive text-center">
+                Authentication error. Please try again.
+              </p>
+            )}
+          </div>
+
+          {/* Footer Links */}
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <Link
+              to="/privacy"
+              className="hover:text-foreground transition-colors"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Privacy Policy
+            </Link>
+            <Link
+              to="https://github.com/supernova-app/ai-playground"
+              className="hover:text-foreground transition-colors"
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub Repository
+            </Link>
           </div>
 
           {/* Main Content */}
@@ -656,57 +705,17 @@ function AuthDialog() {
             </div>
           </div>
 
-          {/* Auth Section */}
-          <div className="w-full max-w-sm space-y-4">
-            {isAuthCheckPending || isLoggingIn ? (
-              <div className="flex flex-col items-center gap-2">
-                <p className="text-sm text-muted-foreground animate-pulse">
-                  {isAuthCheckPending
-                    ? "Checking authentication..."
-                    : "Logging in..."}
-                </p>
-              </div>
-            ) : !authData ? (
-              <Button
-                onClick={handleGoogleLogin}
-                className="w-full"
-                variant="default"
-                size="lg"
-              >
-                <img
-                  height="24"
-                  width="24"
-                  src="https://cdn.simpleicons.org/google/fff"
-                />
-                Continue with Google
-              </Button>
-            ) : null}
-
-            {authError && (
-              <p className="text-sm text-destructive text-center">
-                Authentication error. Please try again.
-              </p>
-            )}
-          </div>
-
-          {/* Footer Links */}
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <Link
-              to="/privacy"
-              className="hover:text-foreground transition-colors"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Privacy Policy
-            </Link>
-            <Link
-              to="https://github.com/supernova-app/ai-playground"
-              className="hover:text-foreground transition-colors"
-              target="_blank"
-              rel="noreferrer"
-            >
-              GitHub Repository
-            </Link>
+          {/* Demo Video */}
+          <div className="w-full aspect-video rounded-lg overflow-hidden">
+            <iframe
+              width="100%"
+              height="100%"
+              src="https://www.youtube.com/embed/I01_t75FT-c"
+              title="Supernova AI Playground Demo"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="border-0"
+            ></iframe>
           </div>
         </div>
       </DialogContent>
