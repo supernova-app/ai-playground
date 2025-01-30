@@ -42,6 +42,8 @@ import {
   Archive,
   Variable,
   Code,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { usePlaygroundStore } from "~/contexts/store";
 import { Conversation } from "~/components/playground/Conversation";
@@ -72,6 +74,7 @@ export default function Home() {
   const { data: authData } = authClient.useSession();
 
   const {
+    theme,
     addRun,
     systemPrompt,
     systemPromptVars,
@@ -82,6 +85,7 @@ export default function Home() {
     maxTokens,
     syncDelete,
     testCases,
+    setTheme,
     setSystemPrompt,
     setConversations,
     addConversation,
@@ -92,6 +96,20 @@ export default function Home() {
     setSyncDelete,
     removeTestCase,
   } = usePlaygroundStore();
+
+  useEffect(() => {
+    const theme = localStorage.getItem("theme");
+
+    if (theme) {
+      setTheme(theme as any);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authData?.session) {
+      document.body.classList.toggle("dark", theme === "dark");
+    }
+  }, [authData?.session, theme]);
 
   const isLoading = conversations.some((conv) => conv.isLoading);
 
@@ -198,13 +216,16 @@ export default function Home() {
   }, [conversations]);
 
   return (
-    <div className="flex h-screen w-full flex-col items-stretch justify-start">
+    <div
+      className={cn(
+        "flex h-screen w-full flex-col items-stretch justify-start",
+      )}
+    >
       <AuthDialog />
 
       <div className="flex flex-row items-center justify-between gap-2 p-4">
         <div className="flex flex-row items-center justify-start gap-2">
           <img src="/logo.svg" alt="Supernova AI Logo" width={24} height={24} />
-
           <p className="text-xl/none font-semibold text-primary">
             <Link
               to="https://www.getsupernova.ai"
@@ -216,7 +237,6 @@ export default function Home() {
             </Link>{" "}
             — AI Playground
           </p>
-
           {authData ? (
             <p className="text-sm font-medium text-muted-foreground">
               [{authData.user.name ?? authData.user.email}] —{" "}
@@ -230,15 +250,42 @@ export default function Home() {
               </Button>
             </p>
           ) : null}
+          <span className="text-xs text-muted-foreground">
+            (
+            <Link
+              to="/privacy"
+              className="hover:text-foreground transition-colors"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Privacy Policy
+            </Link>
+            ,{" "}
+            <Link
+              to="https://github.com/supernova-app/ai-playground"
+              className="hover:text-foreground transition-colors"
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub
+            </Link>
+            )
+          </span>
 
-          <Link
-            to="/privacy"
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            target="_blank"
-            rel="noreferrer"
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              localStorage.setItem(
+                "theme",
+                theme === "light" ? "dark" : "light",
+              );
+              setTheme(theme === "light" ? "dark" : "light");
+            }}
+            title="Toggle Theme"
           >
-            (Privacy Policy)
-          </Link>
+            {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
+          </Button>
         </div>
 
         <div className="flex flex-row items-center justify-end gap-2">
@@ -386,8 +433,8 @@ export default function Home() {
               defaultValue={systemPrompt}
               language="html"
               onChange={(value) => setSystemPrompt(value || "")}
+              theme={theme === "light" ? "vs-light" : "vs-dark"}
               options={{
-                theme: "vs-light",
                 placeholder: "Enter system prompt here...",
                 fontFamily: "JetBrains Mono",
                 fontSize: 12,

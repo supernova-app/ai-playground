@@ -7,11 +7,11 @@ export function cn(...inputs: ClassValue[]) {
 
 export function seededRandomBackground(seed: string) {
   const backgroundClasses = [
-    "border-slate-50 dark:border-slate-900 bg-slate-50/25",
-    "border-gray-50 dark:border-gray-900 bg-gray-50/25",
-    "border-zinc-50 dark:border-zinc-900 bg-zinc-50/25",
-    "border-neutral-50 dark:border-neutral-900 bg-neutral-50/25",
-    "border-stone-50 dark:border-stone-900 bg-stone-50/25",
+    // "border-slate-50 dark:border-slate-900 bg-slate-50/25 dark:bg-slate-900/25",
+    "border-gray-50 dark:border-gray-900 bg-gray-50/25 dark:bg-gray-900/25",
+    // "border-zinc-50 dark:border-zinc-900 bg-zinc-50/25 dark:bg-zinc-900/25",
+    // "border-neutral-50 dark:border-neutral-900 bg-neutral-50/25 dark:bg-neutral-900/25",
+    // "border-stone-50 dark:border-stone-900 bg-stone-50/25 dark:bg-stone-900/25",
     // "border-red-50 dark:border-red-900 bg-red-50/25",
     // "border-orange-50 dark:border-orange-900 bg-orange-50/25",
     // "border-amber-50 dark:border-amber-900 bg-amber-50/25",

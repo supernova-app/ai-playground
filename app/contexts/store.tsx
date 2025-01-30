@@ -7,7 +7,11 @@ import {
 } from "~/config/ai";
 import { extractVariablesFromTemplate } from "~/lib/variables";
 
+type Theme = "light" | "dark";
+
 type PlaygroundStore = {
+  theme: Theme;
+
   runs: number[];
 
   systemPrompt: string;
@@ -27,6 +31,8 @@ type PlaygroundStore = {
     vars: Record<string, string>;
     messages: Conversation["messages"];
   }[];
+
+  setTheme: (theme: Theme) => void;
 
   addRun: () => void;
 
@@ -63,6 +69,8 @@ type PlaygroundStore = {
 };
 
 export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
+  theme: "light",
+
   runs: [],
 
   systemPrompt: "",
@@ -95,6 +103,10 @@ export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
   syncDelete: true,
 
   testCases: [],
+
+  setTheme: (theme: Theme) => {
+    set({ theme });
+  },
 
   addRun: () => set((state) => ({ runs: [...state.runs, Date.now()] })),
 
