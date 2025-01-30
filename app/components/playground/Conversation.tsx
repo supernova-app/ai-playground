@@ -52,12 +52,13 @@ export function Conversation({ id }: ConversationProps) {
     id,
     api: "/api/ai/chat",
     generateId: () => Date.now().toString(),
-    onFinish: (message) => {
+    onFinish: (message, options) => {
       addMessage(id, message as Message);
 
       // scroll to bottom
       document.body.scrollIntoView({ behavior: "smooth", block: "end" });
     },
+    sendExtraMessageFields: true,
     body: {
       provider: currentConversation.provider,
       model: currentConversation.model,
@@ -68,7 +69,7 @@ export function Conversation({ id }: ConversationProps) {
       console.error(
         "Error while generating response for conversation",
         id,
-        error
+        error,
       );
 
       toast.error("Error while generating response. Please try again.", {
@@ -85,7 +86,7 @@ export function Conversation({ id }: ConversationProps) {
   useEffect(() => {
     return usePlaygroundStore.subscribe((currentState, prevState) => {
       const currentConversation = currentState.conversations.find(
-        (conv) => conv.id === id
+        (conv) => conv.id === id,
       )!;
 
       if (currentState.runs.length !== prevState.runs.length) {
@@ -98,12 +99,12 @@ export function Conversation({ id }: ConversationProps) {
                   role: "system" as const,
                   content: injectVarsIntoTemplate(
                     systemPrompt,
-                    systemPromptVars
+                    systemPromptVars,
                   ),
                 } as Message,
                 ...currentConversation.messages,
               ]
-            : currentConversation.messages
+            : currentConversation.messages,
         );
 
         reload();
@@ -121,8 +122,8 @@ export function Conversation({ id }: ConversationProps) {
       className={cn(
         "flex min-h-[75vh] flex-1 flex-col rounded-lg p-4 border-4",
         seededRandomBackground(
-          currentConversation.provider + ":" + currentConversation.model
-        )
+          currentConversation.provider + ":" + currentConversation.model,
+        ),
       )}
     >
       <div className="flex flex-row items-center justify-between">
@@ -270,12 +271,12 @@ export function Conversation({ id }: ConversationProps) {
                   e.currentTarget.style.height = "auto";
                   e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
                 }}
-                className={`message-textarea w-full rounded-lg border p-4 text-sm ${
+                className={`message-textarea resize-none overflow-hidden w-full rounded-lg border p-4 text-sm ${
                   message.role === "user"
                     ? "bg-secondary/50 text-secondary-foreground"
                     : message.role === "system"
-                    ? "bg-green-50"
-                    : "bg-secondary text-secondary-foreground"
+                      ? "bg-green-50"
+                      : "bg-secondary text-secondary-foreground"
                 }`}
               />
             </div>

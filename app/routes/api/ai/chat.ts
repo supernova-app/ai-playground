@@ -37,7 +37,7 @@ export async function action({ request }: Route.ActionArgs) {
       { error: "Unauthorized" },
       {
         status: 401,
-      }
+      },
     );
   }
 
@@ -48,7 +48,7 @@ export async function action({ request }: Route.ActionArgs) {
     console.error(
       "Payload Invalid",
       jsonBody,
-      JSON.stringify(payloadParseResult.error)
+      JSON.stringify(payloadParseResult.error),
     );
 
     return Response.json({ error: payloadParseResult.error }, { status: 400 });

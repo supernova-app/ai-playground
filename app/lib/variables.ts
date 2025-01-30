@@ -6,7 +6,7 @@
  */
 export function injectVarsIntoTemplate(
   promptTemplate: string,
-  vars: Record<string, string> = {}
+  vars: Record<string, string> = {},
 ) {
   // Replace template variables ({{ var }} or {{var}}) with values from vars object
   return promptTemplate.replace(/{{\s*(\w+)\s*}}/g, (match, key) => {
@@ -23,7 +23,7 @@ export function injectVarsIntoTemplate(
  */
 export function extractVariablesFromTemplate(
   promptTemplate: string,
-  defaultVars: Record<string, string> = {}
+  defaultVars: Record<string, string> = {},
 ): Record<string, string> {
   const variableRegex = /{{\s*(\w+)\s*}}/g;
   const matches = promptTemplate.matchAll(variableRegex);

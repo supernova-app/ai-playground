@@ -12,6 +12,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 // import { createAzure } from "@ai-sdk/azure";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 // import { createVertex } from "@ai-sdk/google-vertex";
+import { createFireworks } from "@ai-sdk/fireworks";
 
 import { db, schema } from "./db";
 
@@ -67,6 +68,23 @@ if (process.env.AI_GOOGLE_GENERATIVE_AI_API_KEY) {
 //     },
 //   });
 // }
+
+if (process.env.AI_FIREWORKS_API_KEY) {
+  const fireworks = createFireworks({
+    baseURL: process.env.AI_FIREWORKS_API_URL,
+    apiKey: process.env.AI_FIREWORKS_API_KEY,
+  });
+
+  config.fireworks = {
+    // @ts-expect-error
+    languageModel(modelId) {
+      return fireworks.chatModel(modelId);
+    },
+    textEmbeddingModel(modelId) {
+      return fireworks.textEmbeddingModel(modelId);
+    },
+  };
+}
 
 export const providerRegistry = createProviderRegistry(config);
 

@@ -4,6 +4,7 @@ export const SUPPORTED_PROVIDER_KEYS = [
   "openai",
   "anthropic",
   "google",
+  "fireworks",
 ] as const;
 export type SUPPORTED_PROVIDER_KEY = (typeof SUPPORTED_PROVIDER_KEYS)[number];
 
@@ -40,7 +41,7 @@ export const messageSchema = z.union([
               data: z.string(),
               mimeType: z.string(),
             }),
-          ])
+          ]),
         ),
       ]),
     })
@@ -105,4 +106,9 @@ export const modelSuggestions = {
     "claude-3-haiku-20240307",
   ],
   google: ["gemini-2.0-flash-exp", "gemini-1.5-flash", "gemini-1.5-pro"],
+  fireworks: [
+    "accounts/fireworks/models/deepseek-v3",
+    "accounts/fireworks/models/deepseek-r1",
+    "accounts/fireworks/models/llama-v3p1-405b-instruct",
+  ],
 } satisfies Record<SUPPORTED_PROVIDER_KEY, string[]>;

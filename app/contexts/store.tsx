@@ -55,7 +55,7 @@ type PlaygroundStore = {
   updateMessage: (
     conversationId: string,
     messageId: string,
-    message: Partial<Message>
+    message: Partial<Message>,
   ) => void;
 
   addTestCase: (conversation: Conversation) => void;
@@ -103,7 +103,7 @@ export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
       systemPrompt: prompt,
       systemPromptVars: extractVariablesFromTemplate(
         prompt,
-        state.systemPromptVars
+        state.systemPromptVars,
       ),
     })),
   setSystemPromptVars: (vars) => set({ systemPromptVars: vars }),
@@ -144,13 +144,13 @@ export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
   updateConversation: (id: string, conversation: Partial<Conversation>) =>
     set((state) => ({
       conversations: state.conversations.map((conv) =>
-        conv.id === id ? { ...conv, ...conversation } : conv
+        conv.id === id ? { ...conv, ...conversation } : conv,
       ),
     })),
   duplicateConversation: (id: string) =>
     set((state) => {
       const conversationToDuplicate = state.conversations.find(
-        (conv) => conv.id === id
+        (conv) => conv.id === id,
       );
       if (!conversationToDuplicate) return state;
 
@@ -159,7 +159,7 @@ export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
         (message) => ({
           ...message,
           id: Date.now().toString(),
-        })
+        }),
       );
 
       return {
@@ -181,7 +181,7 @@ export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
       conversations: state.conversations.map((conv) =>
         conv.id === conversationId
           ? { ...conv, messages: [...conv.messages, message] }
-          : conv
+          : conv,
       ),
     })),
   removeMessage: (conversationId: string, messageId: string) =>
@@ -190,11 +190,11 @@ export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
         // delete the message from all conversations (should be same index and role)
 
         const currentConversation = state.conversations.find(
-          (conv) => conv.id === conversationId
+          (conv) => conv.id === conversationId,
         )!;
 
         const currentMessage = currentConversation.messages.find(
-          (message) => message.id === messageId
+          (message) => message.id === messageId,
         )!;
         let currentMessageIndex = -1;
 
@@ -209,7 +209,7 @@ export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
           conversations: state.conversations.map((conv) => ({
             ...conv,
             messages: conv.messages.filter(
-              (_, index) => index !== currentMessageIndex
+              (_, index) => index !== currentMessageIndex,
             ),
           })),
         };
@@ -220,10 +220,10 @@ export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
               ? {
                   ...conv,
                   messages: conv.messages.filter(
-                    (message) => message.id !== messageId
+                    (message) => message.id !== messageId,
                   ),
                 }
-              : conv
+              : conv,
           ),
         };
       }
@@ -231,7 +231,7 @@ export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
   updateMessage: (
     conversationId: string,
     messageId: string,
-    message: Partial<Message>
+    message: Partial<Message>,
   ) =>
     set((state) => {
       const updatedConversations = state.conversations.map((conv) =>
@@ -239,10 +239,12 @@ export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
           ? {
               ...conv,
               messages: conv.messages.map((msg) =>
-                messageId === msg.id ? ({ ...msg, ...message } as Message) : msg
+                messageId === msg.id
+                  ? ({ ...msg, ...message } as Message)
+                  : msg,
               ),
             }
-          : conv
+          : conv,
       );
       return { conversations: updatedConversations };
     }),
@@ -266,6 +268,6 @@ export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
 
 export function useConversation(id: string) {
   return usePlaygroundStore(
-    useShallow((state) => state.conversations.find((c) => c.id === id)!)
+    useShallow((state) => state.conversations.find((c) => c.id === id)!),
   );
 }
