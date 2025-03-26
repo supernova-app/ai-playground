@@ -27,6 +27,7 @@ Running your own instance means full control over data and costs. You only pay f
 ## Setup
 
 1. Clone and install:
+
 ```bash
 git clone https://github.com/supernova-app/ai-playground supernova-ai-playground
 cd supernova-ai-playground
@@ -34,18 +35,21 @@ pnpm install
 ```
 
 2. Set up environment:
+
 ```bash
 cp .env.example .env
 # Edit .env
 ```
 
 3. Run migrations (mainly for the authentication):
+
 ```bash
 pnpm db:generate
 pnpm db:migrate
 ```
 
 4. Start the server:
+
 ```bash
 pnpm dev
 ```
@@ -53,7 +57,7 @@ pnpm dev
 ## Tech Stack
 
 - React + React Router
-- TailwindCSS
+- TailwindCSS (shadcn/ui)
 - Vercel AI SDK
 - Better Auth
 - DrizzleORM (PostgreSQL)
