@@ -48,7 +48,16 @@ export const messageSchema = z.union([
     .merge(commonMessageSchema),
 ]);
 
-export type Message = z.infer<typeof messageSchema>;
+export type Message = z.infer<typeof messageSchema> & {
+  metadata?: {
+    usage?: {
+      promptTokens?: number;
+      completionTokens?: number;
+      totalTokens?: number;
+    };
+    responseTime?: number;
+  };
+};
 
 export const defaultParams = {
   temperature: 0.7,

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Skeleton } from "~/components/ui/skeleton";
@@ -11,7 +11,8 @@ import {
 } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
 import { useChat } from "ai/react";
-import { ClipboardCopy, Copy, Trash } from "lucide-react";
+import { Badge } from "~/components/ui/badge";
+import { ClipboardCopy, Copy, Trash, Sigma, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 import { useConversation, usePlaygroundStore } from "~/contexts/store";
@@ -48,12 +49,35 @@ export function Conversation({ id }: ConversationProps) {
 
   const currentConversation = useConversation(id);
 
+  // Track request start time
+  const requestStartTime = useRef<number | null>(null);
+
   const { isLoading, setMessages, reload } = useChat({
     id,
     api: "/api/ai/chat",
     generateId: () => Date.now().toString(),
     onFinish: (message, options) => {
-      addMessage(id, message as Message);
+      // Calculate response time
+      const responseTime = requestStartTime.current
+        ? Date.now() - requestStartTime.current
+        : null;
+
+      // Reset request start time
+      requestStartTime.current = null;
+
+      // Extract token usage from the API response
+      const metadata = {
+        usage: options?.usage,
+        responseTime,
+      };
+
+      // Add metadata to the message
+      const messageWithMetadata = {
+        ...message,
+        metadata,
+      } as Message;
+
+      addMessage(id, messageWithMetadata);
 
       // scroll to bottom
       document.body.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -66,6 +90,9 @@ export function Conversation({ id }: ConversationProps) {
       temperature,
     },
     onError: (error) => {
+      // Reset request start time on error
+      requestStartTime.current = null;
+
       console.error(
         "Error while generating response for conversation",
         id,
@@ -108,6 +135,9 @@ export function Conversation({ id }: ConversationProps) {
         );
 
         reload();
+
+        // Record the start time when a message is sent
+        requestStartTime.current = Date.now();
       }
     });
   }, [id, systemPrompt, setMessages, reload, systemPromptVars]);
@@ -279,6 +309,39 @@ export function Conversation({ id }: ConversationProps) {
                       : "bg-secondary text-secondary-foreground"
                 }`}
               />
+
+              {/* Display token usage and response time for assistant messages */}
+              {message.role === "assistant" && message.metadata && (
+                <div className="flex flex-wrap gap-2 mt-1 text-xs text-muted-foreground">
+                  {message.metadata.usage && (
+                    <Badge
+                      variant="outline"
+                      className="flex items-center gap-2"
+                      title="Token usage (prompt/completion)"
+                    >
+                      <Sigma className="h-3 w-3" />
+                      {message.metadata.usage.totalTokens || 0}
+                      {message.metadata.usage.promptTokens &&
+                        message.metadata.usage.completionTokens && (
+                          <span className="text-xs opacity-70">
+                            ({message.metadata.usage.promptTokens}/
+                            {message.metadata.usage.completionTokens})
+                          </span>
+                        )}
+                    </Badge>
+                  )}
+                  {message.metadata.responseTime && (
+                    <Badge
+                      variant="outline"
+                      className="flex items-center gap-2"
+                      title="Response generation time"
+                    >
+                      <Clock className="h-3 w-3" />
+                      {(message.metadata.responseTime / 1000).toFixed(2)}s
+                    </Badge>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-2">

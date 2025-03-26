@@ -76,7 +76,6 @@ if (process.env.AI_FIREWORKS_API_KEY) {
   });
 
   config.fireworks = {
-    // @ts-expect-error
     languageModel(modelId) {
       return fireworks.chatModel(modelId);
     },
