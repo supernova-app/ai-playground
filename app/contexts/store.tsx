@@ -9,6 +9,19 @@ import { extractVariablesFromTemplate } from "~/lib/variables";
 
 type Theme = "light" | "dark";
 
+type Attachment = {
+  id: string;
+  type: "image";
+  data: string;
+  mimeType: string;
+};
+
+type PendingMessage = {
+  text: string;
+  role: Message["role"];
+  attachments: Attachment[];
+};
+
 type PlaygroundStore = {
   theme: Theme;
 
@@ -19,8 +32,7 @@ type PlaygroundStore = {
 
   conversations: Conversation[];
 
-  inputMessage: string;
-  inputRole: Message["role"];
+  pendingMessage: PendingMessage;
 
   temperature: number;
   maxTokens: number;
@@ -42,8 +54,11 @@ type PlaygroundStore = {
 
   setConversations: (conversations: Conversation[]) => void;
 
-  setInputMessage: (inputMessage: string) => void;
-  setInputRole: (inputRole: Message["role"]) => void;
+  setPendingMessageText: (text: string) => void;
+  setPendingMessageRole: (role: Message["role"]) => void;
+  addAttachment: (attachment: Omit<Attachment, "id">) => void;
+  removeAttachment: (attachmentId: string) => void;
+  clearPendingMessage: () => void;
 
   setTemperature: (temperature: number) => void;
   setMaxTokens: (maxTokens: number) => void;
@@ -95,8 +110,11 @@ export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
     },
   ],
 
-  inputMessage: "",
-  inputRole: "user" as const,
+  pendingMessage: {
+    text: "",
+    role: "user",
+    attachments: [],
+  },
 
   temperature: 0.7,
   maxTokens: 1024,
@@ -126,8 +144,45 @@ export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
 
   setConversations: (conversations: Conversation[]) => set({ conversations }),
 
-  setInputMessage: (inputMessage: string) => set({ inputMessage }),
-  setInputRole: (inputRole: Message["role"]) => set({ inputRole }),
+  setPendingMessageText: (text: string) =>
+    set((state) => ({
+      pendingMessage: { ...state.pendingMessage, text },
+    })),
+
+  setPendingMessageRole: (role: Message["role"]) =>
+    set((state) => ({
+      pendingMessage: { ...state.pendingMessage, role },
+    })),
+
+  addAttachment: (attachment: Omit<Attachment, "id">) =>
+    set((state) => ({
+      pendingMessage: {
+        ...state.pendingMessage,
+        attachments: [
+          ...state.pendingMessage.attachments,
+          { ...attachment, id: Date.now().toString() },
+        ],
+      },
+    })),
+
+  removeAttachment: (attachmentId: string) =>
+    set((state) => ({
+      pendingMessage: {
+        ...state.pendingMessage,
+        attachments: state.pendingMessage.attachments.filter(
+          (att) => att.id !== attachmentId,
+        ),
+      },
+    })),
+
+  clearPendingMessage: () =>
+    set({
+      pendingMessage: {
+        text: "",
+        role: "user",
+        attachments: [],
+      },
+    }),
 
   setTemperature: (temperature: number) => set({ temperature }),
   setMaxTokens: (maxTokens: number) => set({ maxTokens }),

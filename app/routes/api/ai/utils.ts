@@ -10,8 +10,19 @@ export type PreparedMessage = Pick<Message, "role"> & {
 export function prepareMessages(messages: Message[]) {
   return messages
     .map((message) => {
+      // Handle string content
       if (typeof message.content === "string") {
         return message as PreparedMessage;
+      }
+
+      // Handle array content (text + images)
+      if (Array.isArray(message.content)) {
+        // For multimodal content, keep the original format
+        // This allows each provider to handle it according to their requirements
+        return {
+          role: message.role,
+          content: message.content,
+        };
       }
 
       return null;

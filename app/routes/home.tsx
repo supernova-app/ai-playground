@@ -18,6 +18,7 @@ import {
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { Image, X } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -79,8 +80,7 @@ export default function Home() {
     systemPrompt,
     systemPromptVars,
     conversations,
-    inputMessage,
-    inputRole,
+    pendingMessage,
     temperature,
     maxTokens,
     syncDelete,
@@ -89,8 +89,11 @@ export default function Home() {
     setSystemPrompt,
     setConversations,
     addConversation,
-    setInputMessage,
-    setInputRole,
+    setPendingMessageText,
+    setPendingMessageRole,
+    addAttachment,
+    removeAttachment,
+    clearPendingMessage,
     setTemperature,
     setMaxTokens,
     setSyncDelete,
@@ -123,19 +126,53 @@ export default function Home() {
         window.innerHeight * 0.2,
       )}px`;
     }
-  }, [inputMessage]);
+  }, [pendingMessage.text]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (isLoading) return;
 
-    if (inputMessage.trim()) {
-      const newMessage = {
-        id: Date.now().toString(),
-        role: inputRole,
-        content: inputMessage,
-      };
+    // Check if we have text or attachments to send
+    if (pendingMessage.text.trim() || pendingMessage.attachments.length > 0) {
+      let newMessage: Message;
+
+      if (pendingMessage.attachments.length > 0) {
+        // For messages with attachments, we must use the "user" role
+        const content = [];
+
+        // Add text if it exists
+        if (pendingMessage.text.trim()) {
+          content.push({
+            type: "text" as const,
+            text: pendingMessage.text.trim(),
+          });
+        }
+
+        // Add all attachments
+        pendingMessage.attachments.forEach((attachment) => {
+          if (attachment.type === "image") {
+            content.push({
+              type: "image" as const,
+              image: attachment.data,
+              mimeType: attachment.mimeType,
+            });
+          }
+        });
+
+        newMessage = {
+          id: Date.now().toString(),
+          role: "user",
+          content,
+        };
+      } else {
+        // For text-only messages, we can use the selected role
+        newMessage = {
+          id: Date.now().toString(),
+          role: pendingMessage.role,
+          content: pendingMessage.text,
+        };
+      }
 
       setConversations(
         conversations.map((conversation) => ({
@@ -145,12 +182,39 @@ export default function Home() {
       );
 
       addRun();
-
-      setInputMessage("");
+      clearPendingMessage();
     } else {
-      // this will trigger a reload
+      // Just trigger a reload
       addRun();
     }
+  };
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Check if file is an image
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64Data = e.target?.result as string;
+
+      // Extract base64 data (remove data URL prefix)
+      const base64Content = base64Data.split(",")[1];
+
+      // Add the attachment
+      addAttachment({
+        type: "image",
+        data: base64Content,
+        mimeType: file.type,
+      });
+    };
+
+    reader.readAsDataURL(file);
   };
 
   const handleClearChat = () => {
@@ -511,31 +575,88 @@ export default function Home() {
               id="message"
               placeholder="Type your message here..."
               className="min-h-12 flex-1 resize-none border-0 p-3 shadow-none focus-visible:ring-0 bg-input/50"
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
+              value={pendingMessage.text}
+              onChange={(e) => setPendingMessageText(e.target.value)}
               onKeyDown={handleKeyDown}
               style={{ maxHeight: "20vh" }}
               autoFocus
             />
 
-            <div className="flex items-center justify-between px-3 py-2">
-              <Select
-                value={inputRole}
-                onValueChange={(value) =>
-                  setInputRole(value as Message["role"])
-                }
-              >
-                <SelectTrigger className="w-max">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {role}
-                    </SelectItem>
+            {pendingMessage.attachments.length > 0 && (
+              <div className="px-3 py-2 border-t">
+                <div className="flex flex-wrap items-center gap-2">
+                  {pendingMessage.attachments.map((attachment) => (
+                    <div key={attachment.id} className="relative">
+                      {attachment.type === "image" && (
+                        <img
+                          src={`data:${attachment.mimeType};base64,${attachment.data}`}
+                          alt="Attachment"
+                          className="h-20 w-20 object-contain rounded"
+                        />
+                      )}
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="xs"
+                        className="absolute -top-0 -right-2 p-0.5 h-auto rounded-full"
+                        onClick={() => removeAttachment(attachment.id)}
+                      >
+                        <X className="h-2 w-2" />
+                      </Button>
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between px-3 py-2">
+              <div className="flex items-center gap-2">
+                <Select
+                  value={pendingMessage.role}
+                  onValueChange={(value) =>
+                    setPendingMessageRole(value as Message["role"])
+                  }
+                  disabled={pendingMessage.attachments.length > 0}
+                >
+                  <SelectTrigger className="w-max">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {role}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Input
+                  type="file"
+                  id="image-upload"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                />
+
+                <Button
+                  variant="outline"
+                  size="icon"
+                  disabled={pendingMessage.attachments.length > 0}
+                  asChild
+                >
+                  <Label
+                    htmlFor={
+                      pendingMessage.attachments.length > 0
+                        ? "image-upload-disabled"
+                        : "image-upload"
+                    }
+                    aria-disabled={pendingMessage.attachments.length > 0}
+                    title="Upload Image"
+                  >
+                    <Image className="h-4 w-4" />
+                  </Label>
+                </Button>
+              </div>
 
               <Button type="submit" size="sm" className="ml-2 gap-1.5">
                 <span>Send</span>

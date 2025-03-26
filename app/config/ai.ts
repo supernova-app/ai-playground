@@ -34,14 +34,15 @@ export const messageSchema = z.union([
             }),
             z.object({
               type: z.literal("image"),
-              image: z.string().url(),
+              image: z.string(),
+              mimeType: z.string().optional(),
             }),
             z.object({
               type: z.literal("file"),
               data: z.string(),
               mimeType: z.string(),
             }),
-          ])
+          ]),
         ),
       ]),
     })

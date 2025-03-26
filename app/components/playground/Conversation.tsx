@@ -105,9 +105,23 @@ export function Conversation({ id }: ConversationProps) {
     },
   });
 
-  const handleCopyResponse = (content: string) => {
-    navigator.clipboard.writeText(content);
-    toast.info("Response copied to clipboard!");
+  const handleCopyResponse = (content: Message["content"]) => {
+    const textContent =
+      typeof content === "string"
+        ? content
+        : Array.isArray(content)
+          ? content
+              .filter((part) => part.type === "text")
+              .map((part) => part.text)
+              .join("\n")
+          : "";
+
+    if (textContent) {
+      navigator.clipboard.writeText(textContent);
+      toast.info("Response copied to clipboard!");
+    } else {
+      toast.warning("No text content to copy.");
+    }
   };
 
   useEffect(() => {
@@ -291,24 +305,57 @@ export function Conversation({ id }: ConversationProps) {
                 </SelectContent>
               </Select>
 
-              <Textarea
-                value={message.content as string}
-                onChange={(e) => {
-                  updateMessage(id, message.id!, {
-                    content: e.currentTarget.value,
-                  });
+              {typeof message.content === "string" ? (
+                <Textarea
+                  value={message.content}
+                  onChange={(e) => {
+                    updateMessage(id, message.id!, {
+                      content: e.currentTarget.value,
+                    });
 
-                  e.currentTarget.style.height = "auto";
-                  e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
-                }}
-                className={`message-textarea resize-none overflow-hidden w-full rounded-lg border p-4 text-sm ${
-                  message.role === "user"
-                    ? "bg-secondary/50 text-secondary-foreground"
-                    : message.role === "system"
-                      ? "bg-green-50"
-                      : "bg-secondary text-secondary-foreground"
-                }`}
-              />
+                    e.currentTarget.style.height = "auto";
+                    e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
+                  }}
+                  className={`message-textarea resize-none overflow-hidden w-full rounded-lg border p-4 text-sm ${
+                    message.role === "user"
+                      ? "bg-secondary/50 text-secondary-foreground"
+                      : message.role === "system"
+                        ? "bg-green-50"
+                        : "bg-secondary text-secondary-foreground"
+                  }`}
+                />
+              ) : (
+                Array.isArray(message.content) && (
+                  <div className="flex flex-col gap-2">
+                    {message.content.map((contentPart, idx) => (
+                      <div key={idx}>
+                        {contentPart.type === "text" && (
+                          <Textarea
+                            value={contentPart.text}
+                            readOnly
+                            className={`message-textarea resize-none overflow-hidden w-full rounded-lg border p-4 text-sm ${
+                              message.role === "user"
+                                ? "bg-secondary/50 text-secondary-foreground"
+                                : message.role === "system"
+                                  ? "bg-green-50"
+                                  : "bg-secondary text-secondary-foreground"
+                            }`}
+                          />
+                        )}
+                        {contentPart.type === "image" && (
+                          <div className="border rounded-lg overflow-hidden bg-secondary/20 p-2">
+                            <img
+                              src={`data:${contentPart.mimeType};base64,${contentPart.image}`}
+                              alt="Uploaded image"
+                              className="max-h-64 w-full object-contain"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
 
               {/* Display token usage and response time for assistant messages */}
               {message.role === "assistant" && message.metadata && (
