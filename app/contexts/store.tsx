@@ -11,7 +11,7 @@ type Theme = "light" | "dark";
 
 type Attachment = {
   id: string;
-  type: "image";
+  type: "image" | "file";
   data: string;
   mimeType: string;
 };

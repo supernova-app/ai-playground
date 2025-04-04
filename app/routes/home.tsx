@@ -51,6 +51,7 @@ import { Conversation } from "~/components/playground/Conversation";
 import { roles, type Message } from "~/config/ai";
 import { authClient } from "~/lib/auth-client";
 import { toast } from "sonner";
+import { AudioRecorder } from "~/components/ui/audio-recorder";
 
 import Editor from "@monaco-editor/react";
 import { Link } from "react-router";
@@ -158,6 +159,13 @@ export default function Home() {
               mimeType: attachment.mimeType,
             });
           }
+          if (attachment.type === "file") {
+            content.push({
+              type: "file" as const,
+              data: attachment.data,
+              mimeType: attachment.mimeType,
+            });
+          }
         });
 
         newMessage = {
@@ -215,6 +223,14 @@ export default function Home() {
     };
 
     reader.readAsDataURL(file);
+  };
+
+  const handleAudioCaptured = (audioData: string, mimeType: string) => {
+    addAttachment({
+      type: "file",
+      data: audioData,
+      mimeType: mimeType,
+    });
   };
 
   const handleClearChat = () => {
@@ -587,13 +603,23 @@ export default function Home() {
                 <div className="flex flex-wrap items-center gap-2">
                   {pendingMessage.attachments.map((attachment) => (
                     <div key={attachment.id} className="relative">
-                      {attachment.type === "image" && (
+                      {attachment.type === "image" ? (
                         <img
                           src={`data:${attachment.mimeType};base64,${attachment.data}`}
                           alt="Attachment"
                           className="h-20 w-20 object-contain rounded"
                         />
-                      )}
+                      ) : null}
+                      {attachment.type === "file"
+                        ? attachment.mimeType.startsWith("audio/") && (
+                            <div className="flex flex-col items-center gap-1">
+                              <audio
+                                src={`data:${attachment.mimeType};base64,${attachment.data}`}
+                                controls
+                              />
+                            </div>
+                          )
+                        : null}
                       <Button
                         type="button"
                         variant="destructive"
@@ -656,6 +682,11 @@ export default function Home() {
                     <Image className="h-4 w-4" />
                   </Label>
                 </Button>
+
+                <AudioRecorder
+                  onAudioCaptured={handleAudioCaptured}
+                  disabled={pendingMessage.attachments.length > 0}
+                />
               </div>
 
               <Button type="submit" size="sm" className="ml-2 gap-1.5">

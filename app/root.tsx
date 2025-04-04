@@ -37,7 +37,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Meta />
         <Links />
       </head>
-      <body>
+      <body className="antialiased">
         <TooltipProvider>
           {children}
           <Toaster theme="light" richColors closeButton position="top-center" />

@@ -351,6 +351,16 @@ export function Conversation({ id }: ConversationProps) {
                             />
                           </div>
                         )}
+                        {contentPart.type === "file" &&
+                          contentPart.mimeType.startsWith("audio/") && (
+                            <div className="border rounded-lg overflow-hidden bg-secondary/20 p-2">
+                              <audio
+                                src={`data:${contentPart.mimeType};base64,${contentPart.data}`}
+                                controls
+                                className="w-full"
+                              />
+                            </div>
+                          )}
                       </div>
                     ))}
                   </div>
