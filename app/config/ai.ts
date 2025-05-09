@@ -84,13 +84,28 @@ export const defaultConversationConfig = {
 } satisfies Pick<Conversation, "provider" | "model">;
 
 export const modelSuggestions = {
-  openai: ["gpt-4o", "gpt-4o-mini", "o3-mini", "o1-mini", "o1", "o1-preview"],
-  anthropic: ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
+  openai: [
+    "gpt-4o",
+    "gpt-4o-mini",
+    "gpt-4.1-2025-04-14",
+    "gpt-4.1-mini-2025-04-14",
+    "gpt-4.1-nano-2025-04-14",
+    "o4-mini-2025-04-16",
+    "o3-mini",
+    "o1",
+  ],
+  anthropic: [
+    "claude-3-7-sonnet-20250219",
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-haiku-20241022",
+  ],
   google: [
+    "gemini-2.5-pro-preview-05-06",
+    "gemini-2.5-flash-preview-04-17",
     "gemini-2.0-flash-001",
+    "gemini-2.0-flash-thinking-exp-01-21",
     "gemini-2.0-flash-lite-preview-02-05",
     "gemini-2.0-pro-exp-02-05",
-    "gemini-2.0-flash-thinking-exp-01-21",
     "gemini-1.5-flash",
     "gemini-1.5-pro",
   ],
