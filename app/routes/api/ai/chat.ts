@@ -27,6 +27,24 @@ const payloadSchema = z.object({
   max_tokens: z.number().int().optional().default(defaultParams.max_tokens),
 });
 
+function getProviderOptionsForAISDK(
+  provider: string,
+  model: string,
+): Record<string, any> | undefined {
+  const specificGoogleModels = ["gemini-2.5-flash-preview-04-17"];
+
+  if (provider === "google" && specificGoogleModels.includes(model)) {
+    return {
+      google: {
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
+      },
+    };
+  }
+  return undefined;
+}
+
 export async function action({ request }: Route.ActionArgs) {
   const session = await auth.api.getSession({
     headers: request.headers,
@@ -61,6 +79,11 @@ export async function action({ request }: Route.ActionArgs) {
   // eg. openai:gpt-4o
   const modelId = `${payload.provider}:${payload.model}`;
 
+  const providerOptions = getProviderOptionsForAISDK(
+    payload.provider,
+    payload.model,
+  );
+
   const result = streamText({
     model: wrapLanguageModel({
       model: providerRegistry.languageModel(modelId),
@@ -71,7 +94,7 @@ export async function action({ request }: Route.ActionArgs) {
 
     temperature: payload.temperature,
     maxTokens: payload.max_tokens,
-
+    ...(providerOptions && { providerOptions }),
     headers: {
       "user-id": session.user.id,
     },
