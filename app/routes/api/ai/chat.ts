@@ -40,6 +40,8 @@ function getProviderOptionsForAISDK(
     "gemini-2.5-pro",
   ];
 
+  const openaiModelsWithThinkingOff = ["gpt-5.2", "gpt-5.2-mini"];
+
   if (provider === "google" && specificGoogleModels.includes(model)) {
     return {
       google: {
@@ -49,6 +51,15 @@ function getProviderOptionsForAISDK(
       },
     };
   }
+
+  if (provider === "openai" && openaiModelsWithThinkingOff.includes(model)) {
+    return {
+      openai: {
+        reasoningEffort: "none",
+      },
+    };
+  }
+
   return undefined;
 }
 
