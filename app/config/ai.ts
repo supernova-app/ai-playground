@@ -85,6 +85,8 @@ export const defaultConversationConfig = {
 
 export const modelSuggestions = {
   openai: [
+    "gpt-5.2",
+    "gpt-5.2-mini",
     "gpt-4o",
     "gpt-4o-mini",
     "gpt-4.1-2025-04-14",
