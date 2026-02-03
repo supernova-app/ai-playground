@@ -94,21 +94,45 @@ export async function action({ request }: Route.ActionArgs) {
     payload.model,
   );
 
-  const result = streamText({
-    model: wrapLanguageModel({
-      model: providerRegistry.languageModel(modelId),
-      middleware: logMiddleware,
-    }),
+  try {
+    const result = streamText({
+      model: wrapLanguageModel({
+        model: providerRegistry.languageModel(modelId),
+        middleware: logMiddleware,
+      }),
 
-    messages: payload.messages,
+      messages: payload.messages,
 
-    temperature: payload.temperature,
-    maxTokens: payload.max_tokens,
-    ...(providerOptions && { providerOptions }),
-    headers: {
-      "user-id": session.user.id,
-    },
-  });
+      temperature: payload.temperature,
+      maxTokens: payload.max_tokens,
+      ...(providerOptions && { providerOptions }),
+      headers: {
+        "user-id": session.user.id,
+      },
+    });
 
-  return result.toDataStreamResponse();
+    return result.toDataStreamResponse();
+  } catch (error: any) {
+    console.error("AI API Error:", {
+      provider: payload.provider,
+      model: payload.model,
+      modelId,
+      providerOptions,
+      messagesCount: payload.messages.length,
+      messages: JSON.stringify(payload.messages, null, 2),
+      errorName: error?.name,
+      errorMessage: error?.message,
+      errorCause: error?.cause,
+      errorData: error?.data,
+      fullError: JSON.stringify(error, Object.getOwnPropertyNames(error), 2),
+    });
+
+    return Response.json(
+      {
+        error: error?.message || "Unknown error",
+        details: error?.data || error?.cause,
+      },
+      { status: error?.status || 500 },
+    );
+  }
 }
