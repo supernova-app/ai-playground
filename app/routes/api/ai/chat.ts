@@ -30,6 +30,7 @@ const payloadSchema = z.object({
 function getProviderOptionsForAISDK(
   provider: string,
   model: string,
+  maxTokens: number,
 ): Record<string, any> | undefined {
   const specificGoogleModels = [
     "gemini-2.5-flash-preview-04-17",
@@ -50,9 +51,21 @@ function getProviderOptionsForAISDK(
     };
   }
 
-  // GPT-5.2 models default to reasoningEffort: 'none', no config needed
+  // GPT-5.2 models require max_completion_tokens instead of max_tokens
+  if (provider === "openai" && model.startsWith("gpt-5.2")) {
+    return {
+      openai: {
+        maxCompletionTokens: maxTokens,
+      },
+    };
+  }
 
   return undefined;
+}
+
+function shouldOmitMaxTokens(provider: string, model: string): boolean {
+  // GPT-5.2 models don't support max_tokens, use max_completion_tokens via providerOptions instead
+  return provider === "openai" && model.startsWith("gpt-5.2");
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -92,7 +105,10 @@ export async function action({ request }: Route.ActionArgs) {
   const providerOptions = getProviderOptionsForAISDK(
     payload.provider,
     payload.model,
+    payload.max_tokens,
   );
+
+  const omitMaxTokens = shouldOmitMaxTokens(payload.provider, payload.model);
 
   try {
     const result = streamText({
@@ -104,7 +120,7 @@ export async function action({ request }: Route.ActionArgs) {
       messages: payload.messages,
 
       temperature: payload.temperature,
-      maxTokens: payload.max_tokens,
+      ...(!omitMaxTokens && { maxTokens: payload.max_tokens }),
       ...(providerOptions && { providerOptions }),
       headers: {
         "user-id": session.user.id,
