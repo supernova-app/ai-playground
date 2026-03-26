@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Skeleton } from "~/components/ui/skeleton";
@@ -10,7 +10,6 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
-import { useChat } from "ai/react";
 import { Badge } from "~/components/ui/badge";
 import { ClipboardCopy, Copy, Trash, Sigma, Clock } from "lucide-react";
 import { toast } from "sonner";
@@ -18,18 +17,67 @@ import { toast } from "sonner";
 import { useConversation, usePlaygroundStore } from "~/contexts/store";
 import {
   defaultConversationConfig,
-  modelSuggestions,
+  reasoningEfforts,
   roles,
-  SUPPORTED_PROVIDER_KEYS,
   type Message,
-  type SUPPORTED_PROVIDER_KEY,
+  type ReasoningEffort,
 } from "~/config/ai";
 import { injectVarsIntoTemplate } from "~/lib/variables";
 import { cn, seededRandomBackground } from "~/lib/utils";
+import { useModels } from "~/hooks/useModels";
 
 type ConversationProps = {
   id: string;
 };
+
+async function streamChat(
+  messages: Message[],
+  body: Record<string, unknown>,
+  onDelta: (text: string) => void,
+  signal?: AbortSignal,
+): Promise<{ text: string; responseTime: number; usage?: NonNullable<Message["metadata"]>["usage"] }> {
+  const start = Date.now();
+
+  const response = await fetch("/api/ai/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, messages }),
+    signal,
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.error || `Request failed with status ${response.status}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("No response body");
+
+  const decoder = new TextDecoder();
+  let fullText = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    fullText += chunk;
+    onDelta(chunk);
+  }
+
+  // Extract usage metadata appended by the server
+  let usage: NonNullable<Message["metadata"]>["usage"];
+  const metaDelimiter = "\n__META__";
+  const metaIndex = fullText.lastIndexOf(metaDelimiter);
+  if (metaIndex !== -1) {
+    try {
+      const meta = JSON.parse(fullText.substring(metaIndex + metaDelimiter.length));
+      usage = meta.usage;
+    } catch {}
+    fullText = fullText.substring(0, metaIndex);
+  }
+
+  return { text: fullText, responseTime: Date.now() - start, usage };
+}
 
 export function Conversation({ id }: ConversationProps) {
   const {
@@ -47,63 +95,64 @@ export function Conversation({ id }: ConversationProps) {
     conversations,
   } = usePlaygroundStore();
 
+  const { models, providers } = useModels();
+
   const currentConversation = useConversation(id);
 
-  // Track request start time
-  const requestStartTime = useRef<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const { isLoading, setMessages, reload } = useChat({
-    id,
-    api: "/api/ai/chat",
-    generateId: () => Date.now().toString(),
-    onFinish: (message, options) => {
-      // Calculate response time
-      const responseTime = requestStartTime.current
-        ? Date.now() - requestStartTime.current
-        : null;
+  const sendMessages = useCallback(
+    async (messages: Message[]) => {
+      updateConversation(id, { isLoading: true });
 
-      // Reset request start time
-      requestStartTime.current = null;
-
-      // Extract token usage from the API response
-      const metadata = {
-        usage: options?.usage,
-        responseTime,
+      const body = {
+        provider: currentConversation.provider,
+        model: currentConversation.model,
+        max_tokens: maxTokens,
+        temperature,
+        reasoningEffort: currentConversation.reasoningEffort,
       };
 
-      // Add metadata to the message
-      const messageWithMetadata = {
-        ...message,
-        metadata,
-      } as Message;
+      try {
+        abortRef.current = new AbortController();
 
-      addMessage(id, messageWithMetadata);
+        const { text, responseTime, usage } = await streamChat(
+          messages,
+          body,
+          () => {
+            // Streaming delta - could be used for live preview in the future
+          },
+          abortRef.current.signal,
+        );
 
-      // scroll to bottom
-      document.body.scrollIntoView({ behavior: "smooth", block: "end" });
+        const assistantMessage: Message = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: text,
+          metadata: { responseTime, usage },
+        };
+
+        addMessage(id, assistantMessage);
+
+        // scroll to bottom
+        document.body.scrollIntoView({ behavior: "smooth", block: "end" });
+      } catch (error: any) {
+        if (error.name === "AbortError") return;
+        console.error(
+          "Error while generating response for conversation",
+          id,
+          error,
+        );
+        toast.error("Error while generating response. Please try again.", {
+          description: error.message,
+        });
+      } finally {
+        updateConversation(id, { isLoading: false });
+        abortRef.current = null;
+      }
     },
-    sendExtraMessageFields: true,
-    body: {
-      provider: currentConversation.provider,
-      model: currentConversation.model,
-      max_tokens: maxTokens,
-      temperature,
-    },
-    onError: (error) => {
-      // Reset request start time on error
-      requestStartTime.current = null;
-
-      console.error(
-        "Error while generating response for conversation",
-        id,
-        error,
-      );
-
-      toast.error("Error while generating response. Please try again.", {
-        description: error.message,
-      });
-    },
-  });
+    [id, currentConversation.provider, currentConversation.model, currentConversation.reasoningEffort, maxTokens, temperature, updateConversation, addMessage],
+  );
 
   const handleCopyResponse = (content: Message["content"]) => {
     const textContent =
@@ -131,34 +180,24 @@ export function Conversation({ id }: ConversationProps) {
       )!;
 
       if (currentState.runs.length !== prevState.runs.length) {
-        setMessages(
-          // @ts-ignore TODO
-          systemPrompt
-            ? [
-                {
-                  id: Date.now().toString(),
-                  role: "system" as const,
-                  content: injectVarsIntoTemplate(
-                    systemPrompt,
-                    systemPromptVars,
-                  ),
-                } as Message,
-                ...currentConversation.messages,
-              ]
-            : currentConversation.messages,
-        );
+        const messages = systemPrompt
+          ? [
+              {
+                id: Date.now().toString(),
+                role: "system" as const,
+                content: injectVarsIntoTemplate(
+                  systemPrompt,
+                  systemPromptVars,
+                ),
+              } as Message,
+              ...currentConversation.messages,
+            ]
+          : currentConversation.messages;
 
-        reload();
-
-        // Record the start time when a message is sent
-        requestStartTime.current = Date.now();
+        sendMessages(messages);
       }
     });
-  }, [id, systemPrompt, setMessages, reload, systemPromptVars]);
-
-  useEffect(() => {
-    updateConversation(id, { isLoading });
-  }, [id, updateConversation, isLoading]);
+  }, [id, systemPrompt, systemPromptVars, sendMessages]);
 
   return (
     <div
@@ -178,7 +217,7 @@ export function Conversation({ id }: ConversationProps) {
             }
             onValueChange={(value) => {
               updateConversation(id, {
-                provider: value as SUPPORTED_PROVIDER_KEY,
+                provider: value,
               });
             }}
             required
@@ -187,7 +226,7 @@ export function Conversation({ id }: ConversationProps) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {SUPPORTED_PROVIDER_KEYS.map((provider) => (
+              {providers.map((provider) => (
                 <SelectItem key={provider} value={provider}>
                   {provider}
                 </SelectItem>
@@ -217,12 +256,30 @@ export function Conversation({ id }: ConversationProps) {
               {/* <SelectValue /> */}
             </SelectTrigger>
             <SelectContent>
-              {modelSuggestions[
+              {(models[
                 currentConversation.provider ??
                   defaultConversationConfig.provider
-              ]?.map((model) => (
+              ] ?? []).map((model) => (
                 <SelectItem key={model} value={model}>
                   {model}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={currentConversation.reasoningEffort}
+            onValueChange={(value) =>
+              updateConversation(id, { reasoningEffort: value as ReasoningEffort })
+            }
+          >
+            <SelectTrigger className="w-max bg-input/25 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {reasoningEfforts.map((effort) => (
+                <SelectItem key={effort} value={effort}>
+                  {effort === "off" ? "Thinking: Off" : `Thinking: ${effort}`}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -345,17 +402,17 @@ export function Conversation({ id }: ConversationProps) {
                         {contentPart.type === "image" && (
                           <div className="border rounded-lg overflow-hidden bg-secondary/20 p-2">
                             <img
-                              src={`data:${contentPart.mimeType};base64,${contentPart.image}`}
+                              src={`data:${contentPart.mediaType};base64,${contentPart.image}`}
                               alt="Uploaded image"
                               className="max-h-64 w-full object-contain"
                             />
                           </div>
                         )}
                         {contentPart.type === "file" &&
-                          contentPart.mimeType.startsWith("audio/") && (
+                          contentPart.mediaType.startsWith("audio/") && (
                             <div className="border rounded-lg overflow-hidden bg-secondary/20 p-2">
                               <audio
-                                src={`data:${contentPart.mimeType};base64,${contentPart.data}`}
+                                src={`data:${contentPart.mediaType};base64,${contentPart.data}`}
                                 controls
                                 className="w-full"
                               />

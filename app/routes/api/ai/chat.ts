@@ -1,71 +1,61 @@
 import type { Route } from "./+types/chat";
 
-import {
-  defaultParams,
-  messageSchema,
-  SUPPORTED_PROVIDER_KEYS,
-} from "~/config/ai";
+import { defaultParams, messageSchema, reasoningEfforts } from "~/config/ai";
 
-import {
-  streamText,
-  experimental_wrapLanguageModel as wrapLanguageModel,
-} from "ai";
+import { streamText, wrapLanguageModel } from "ai";
 
 import { z } from "zod";
-import { logMiddleware, providerRegistry } from "~/lib/ai";
+import { logMiddleware, gateway } from "~/lib/ai";
 import { auth } from "~/lib/auth.server";
 
 export const maxDuration = 30;
 
 const payloadSchema = z.object({
-  provider: z.enum(SUPPORTED_PROVIDER_KEYS),
+  provider: z.string(),
   model: z.string(),
 
   messages: z.array(messageSchema),
 
   temperature: z.number().optional().default(defaultParams.temperature),
   max_tokens: z.number().int().optional().default(defaultParams.max_tokens),
+  reasoningEffort: z.enum(reasoningEfforts).optional().default("off"),
 });
 
-function getProviderOptionsForAISDK(
+function getReasoningProviderOptions(
   provider: string,
-  model: string,
-  maxTokens: number,
+  effort: string,
 ): Record<string, any> | undefined {
-  const specificGoogleModels = [
-    "gemini-2.5-flash-preview-04-17",
-    "gemini-2.5-flash-preview-05-20",
-    "gemini-2.5-pro-preview-06-05",
-    "gemini-2.5-pro-preview-05-06",
-    "gemini-2.5-flash",
-    "gemini-2.5-pro",
-  ];
-
-  if (provider === "google" && specificGoogleModels.includes(model)) {
-    return {
-      google: {
-        thinkingConfig: {
-          thinkingBudget: 0,
-        },
-      },
-    };
+  if (effort === "off") {
+    switch (provider) {
+      case "google":
+        return {
+          google: { thinkingConfig: { thinkingBudget: 0 } },
+        };
+      case "anthropic":
+        return {
+          anthropic: { thinking: { type: "disabled" } },
+        };
+      default:
+        return undefined;
+    }
   }
 
-  // GPT-5.2 models require max_completion_tokens instead of max_tokens
-  if (provider === "openai" && model.startsWith("gpt-5.2")) {
-    return {
-      openai: {
-        maxCompletionTokens: maxTokens,
-      },
-    };
+  switch (provider) {
+    case "openai":
+      return {
+        openai: { reasoningEffort: effort },
+      };
+    case "anthropic":
+      return {
+        anthropic: { thinking: { type: "adaptive" } },
+      };
+    case "google":
+      return {
+        google: { thinkingConfig: { thinkingLevel: effort } },
+      };
+    default:
+      return undefined;
   }
-
-  return undefined;
-}
-
-function shouldOmitMaxTokens(provider: string, model: string): boolean {
-  // GPT-5.2 models don't support max_tokens, use max_completion_tokens via providerOptions instead
-  return provider === "openai" && model.startsWith("gpt-5.2");
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -97,37 +87,53 @@ export async function action({ request }: Route.ActionArgs) {
 
   const payload = payloadParseResult.data;
 
-  // modelId is used by the registry to get the right model
-  // syntax is provider:model
-  // eg. openai:gpt-4o
-  const modelId = `${payload.provider}:${payload.model}`;
+  // Gateway model ID format: provider/model
+  const modelId = `${payload.provider}/${payload.model}`;
 
-  const providerOptions = getProviderOptionsForAISDK(
+  const providerOptions = getReasoningProviderOptions(
     payload.provider,
-    payload.model,
-    payload.max_tokens,
+    payload.reasoningEffort,
   );
-
-  const omitMaxTokens = shouldOmitMaxTokens(payload.provider, payload.model);
 
   try {
     const result = streamText({
       model: wrapLanguageModel({
-        model: providerRegistry.languageModel(modelId),
+        model: gateway(modelId),
         middleware: logMiddleware,
       }),
 
       messages: payload.messages,
 
       temperature: payload.temperature,
-      ...(!omitMaxTokens && { maxTokens: payload.max_tokens }),
+      maxOutputTokens: payload.max_tokens,
       ...(providerOptions && { providerOptions }),
       headers: {
         "user-id": session.user.id,
       },
     });
 
-    return result.toDataStreamResponse();
+    // Stream text and append usage metadata at the end
+    const textStream = result.textStream;
+    const usagePromise = result.usage;
+    const encoder = new TextEncoder();
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        for await (const chunk of textStream) {
+          controller.enqueue(encoder.encode(chunk));
+        }
+        // Append usage metadata after stream completes
+        const usage = await usagePromise;
+        controller.enqueue(
+          encoder.encode(`\n__META__${JSON.stringify({ usage })}`),
+        );
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
   } catch (error: any) {
     console.error("AI API Error:", {
       provider: payload.provider,
