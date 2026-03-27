@@ -6,8 +6,14 @@ Multi-model prompt evaluation tool used internally at Supernova AI. We built thi
 
 ## What it does
 
-- Tests prompts across multiple AI models simultaneously (OpenAI, Anthropic, Azure, Google Generative AI, VertexAI, and more)
+- Tests prompts across multiple AI models simultaneously via the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) (OpenAI, Anthropic, Google, Cerebras, DeepSeek, and many more)
 - Shows responses side-by-side for easy comparison
+- Streams responses in real-time
+- Per-conversation reasoning/thinking effort control (off/low/medium/high) — maps to each provider's native format:
+  - **OpenAI**: `reasoningEffort` (low/medium/high)
+  - **Anthropic (Claude 4.6)**: adaptive thinking (auto)
+  - **Google**: `thinkingLevel` (low/medium/high)
+- Dynamic model discovery from the gateway — no hardcoded model lists
 - Stores system prompts and variables separately
 - Saves test cases for future testing
 - Syncs message deletion across conversations
@@ -22,7 +28,7 @@ The interface is intentionally simple. Enter a prompt once, see how different mo
 
 We think more AI companies could benefit from faster prompt testing. And we want others to help make it better.
 
-Running your own instance means full control over data and costs. You only pay for the API calls you make.
+Running your own instance means full control over data and costs. You only pay for the API calls you make through the Vercel AI Gateway.
 
 ## Setup
 
@@ -58,7 +64,7 @@ pnpm dev
 
 - React + React Router
 - TailwindCSS (shadcn/ui)
-- Vercel AI SDK
+- Vercel AI SDK v6 + AI Gateway
 - Better Auth
 - DrizzleORM (PostgreSQL)
 
