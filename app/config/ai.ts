@@ -44,13 +44,24 @@ export const messageSchema = z.union([
 export type Message = z.infer<typeof messageSchema> & {
   metadata?: {
     usage?: {
-      promptTokens?: number;
-      completionTokens?: number;
+      inputTokens?: number;
+      outputTokens?: number;
       totalTokens?: number;
     };
     responseTime?: number;
   };
 };
+
+export const uiMessageSchema = z.object({
+  id: z.string(),
+  role: z.enum(roles),
+  parts: z.array(
+    z.object({
+      type: z.string(),
+    }).passthrough(),
+  ),
+  metadata: z.unknown().optional(),
+});
 
 export const defaultParams = {
   temperature: 0.7,
@@ -76,5 +87,5 @@ export type Conversation = {
 
 export const defaultConversationConfig = {
   provider: "anthropic",
-  model: "claude-sonnet-4-20250514",
+  model: "claude-sonnet-4.6",
 } satisfies Pick<Conversation, "provider" | "model">;

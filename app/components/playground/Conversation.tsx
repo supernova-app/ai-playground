@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Skeleton } from "~/components/ui/skeleton";
@@ -13,6 +13,8 @@ import { Textarea } from "~/components/ui/textarea";
 import { Badge } from "~/components/ui/badge";
 import { ClipboardCopy, Copy, Trash, Sigma, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport, type LanguageModelUsage } from "ai";
 
 import { useConversation, usePlaygroundStore } from "~/contexts/store";
 import {
@@ -29,55 +31,6 @@ import { useModels } from "~/hooks/useModels";
 type ConversationProps = {
   id: string;
 };
-
-async function streamChat(
-  messages: Message[],
-  body: Record<string, unknown>,
-  onDelta: (text: string) => void,
-  signal?: AbortSignal,
-): Promise<{ text: string; responseTime: number; usage?: NonNullable<Message["metadata"]>["usage"] }> {
-  const start = Date.now();
-
-  const response = await fetch("/api/ai/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, messages }),
-    signal,
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({}));
-    throw new Error(errorBody.error || `Request failed with status ${response.status}`);
-  }
-
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error("No response body");
-
-  const decoder = new TextDecoder();
-  let fullText = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const chunk = decoder.decode(value, { stream: true });
-    fullText += chunk;
-    onDelta(chunk);
-  }
-
-  // Extract usage metadata appended by the server
-  let usage: NonNullable<Message["metadata"]>["usage"];
-  const metaDelimiter = "\n__META__";
-  const metaIndex = fullText.lastIndexOf(metaDelimiter);
-  if (metaIndex !== -1) {
-    try {
-      const meta = JSON.parse(fullText.substring(metaIndex + metaDelimiter.length));
-      usage = meta.usage;
-    } catch {}
-    fullText = fullText.substring(0, metaIndex);
-  }
-
-  return { text: fullText, responseTime: Date.now() - start, usage };
-}
 
 export function Conversation({ id }: ConversationProps) {
   const {
@@ -99,60 +52,68 @@ export function Conversation({ id }: ConversationProps) {
 
   const currentConversation = useConversation(id);
 
-  const abortRef = useRef<AbortController | null>(null);
+  const requestStartTime = useRef<number | null>(null);
 
-  const sendMessages = useCallback(
-    async (messages: Message[]) => {
-      updateConversation(id, { isLoading: true });
+  const {
+    messages: chatMessages,
+    status,
+    sendMessage,
+    setMessages,
+  } = useChat({
+    id,
+    transport: new DefaultChatTransport({
+      api: "/api/ai/chat",
+    }),
+    onFinish: ({ message }) => {
+      const responseTime = requestStartTime.current
+        ? Date.now() - requestStartTime.current
+        : null;
+      requestStartTime.current = null;
 
-      const body = {
-        provider: currentConversation.provider,
-        model: currentConversation.model,
-        max_tokens: maxTokens,
-        temperature,
-        reasoningEffort: currentConversation.reasoningEffort,
+
+      // Extract text from parts
+      const text = message.parts
+        ?.map((part) => (part.type === "text" ? part.text : ""))
+        .join("") || "";
+
+      const meta = message.metadata as { usage?: LanguageModelUsage } | undefined;
+
+      const assistantMessage: Message = {
+        id: message.id,
+        role: "assistant",
+        content: text,
+        metadata: {
+          responseTime: responseTime ?? undefined,
+          usage: meta?.usage,
+        },
       };
 
-      try {
-        abortRef.current = new AbortController();
-
-        const { text, responseTime, usage } = await streamChat(
-          messages,
-          body,
-          () => {
-            // Streaming delta - could be used for live preview in the future
-          },
-          abortRef.current.signal,
-        );
-
-        const assistantMessage: Message = {
-          id: Date.now().toString(),
-          role: "assistant",
-          content: text,
-          metadata: { responseTime, usage },
-        };
-
-        addMessage(id, assistantMessage);
-
-        // scroll to bottom
-        document.body.scrollIntoView({ behavior: "smooth", block: "end" });
-      } catch (error: any) {
-        if (error.name === "AbortError") return;
-        console.error(
-          "Error while generating response for conversation",
-          id,
-          error,
-        );
-        toast.error("Error while generating response. Please try again.", {
-          description: error.message,
-        });
-      } finally {
-        updateConversation(id, { isLoading: false });
-        abortRef.current = null;
-      }
+      addMessage(id, assistantMessage);
+      document.body.scrollIntoView({ behavior: "smooth", block: "end" });
     },
-    [id, currentConversation.provider, currentConversation.model, currentConversation.reasoningEffort, maxTokens, temperature, updateConversation, addMessage],
-  );
+    onError: (error) => {
+      requestStartTime.current = null;
+      console.error(
+        "Error while generating response for conversation",
+        id,
+        error,
+      );
+      toast.error("Error while generating response. Please try again.", {
+        description: error.message,
+      });
+    },
+  });
+
+  const isLoading = status === "streaming" || status === "submitted";
+
+  // Get the streaming assistant message text (only while actively streaming, not while submitted/waiting)
+  const streamingText = status === "streaming"
+    ? chatMessages
+        .filter((m) => m.role === "assistant")
+        .at(-1)
+        ?.parts?.map((part) => (part.type === "text" ? part.text : ""))
+        .join("") || ""
+    : null;
 
   const handleCopyResponse = (content: Message["content"]) => {
     const textContent =
@@ -194,10 +155,50 @@ export function Conversation({ id }: ConversationProps) {
             ]
           : currentConversation.messages;
 
-        sendMessages(messages);
+        const toUIMessage = (m: Message) => ({
+          id: m.id || Date.now().toString(),
+          role: m.role as "system" | "user" | "assistant",
+          parts: [
+            {
+              type: "text" as const,
+              text: typeof m.content === "string" ? m.content : "",
+            },
+          ],
+        });
+
+        const bodyOptions = {
+          body: {
+            provider: currentConversation.provider,
+            model: currentConversation.model,
+            max_tokens: currentState.maxTokens,
+            temperature: currentState.temperature,
+            reasoningEffort: currentConversation.reasoningEffort,
+          },
+        };
+
+        // Set history (all except last), then send the last message
+        const history = messages.slice(0, -1);
+        const lastMessage = messages.at(-1);
+
+        setMessages(history.map(toUIMessage));
+
+        if (lastMessage) {
+          const text = typeof lastMessage.content === "string"
+            ? lastMessage.content
+            : "";
+          sendMessage({ text }, bodyOptions);
+        }
+
+        requestStartTime.current = Date.now();
       }
     });
-  }, [id, systemPrompt, systemPromptVars, sendMessages]);
+  }, [id, systemPrompt, systemPromptVars, setMessages, sendMessage]);
+
+  useEffect(() => {
+    updateConversation(id, { isLoading });
+  }, [id, updateConversation, isLoading]);
+
+
 
   return (
     <div
@@ -325,7 +326,7 @@ export function Conversation({ id }: ConversationProps) {
       </div>
 
       <div className="mt-4 flex-1">
-        {currentConversation.messages.length === 0 ? (
+        {currentConversation.messages.length === 0 && !streamingText ? (
           <div className="h-[50%] flex items-center justify-center">
             <p className="text-center text-sm font-medium">Start chatting!</p>
           </div>
@@ -431,15 +432,15 @@ export function Conversation({ id }: ConversationProps) {
                     <Badge
                       variant="outline"
                       className="flex items-center gap-2"
-                      title="Token usage (prompt/completion)"
+                      title="Token usage (input/output)"
                     >
                       <Sigma className="h-3 w-3" />
                       {message.metadata.usage.totalTokens || 0}
-                      {message.metadata.usage.promptTokens &&
-                        message.metadata.usage.completionTokens && (
+                      {message.metadata.usage.inputTokens != null &&
+                        message.metadata.usage.outputTokens != null && (
                           <span className="text-xs opacity-70">
-                            ({message.metadata.usage.promptTokens}/
-                            {message.metadata.usage.completionTokens})
+                            ({message.metadata.usage.inputTokens}/
+                            {message.metadata.usage.outputTokens})
                           </span>
                         )}
                     </Badge>
@@ -478,7 +479,29 @@ export function Conversation({ id }: ConversationProps) {
           </div>
         ))}
 
-        {currentConversation.isLoading ? (
+        {/* Streaming assistant message */}
+        {streamingText ? (
+          <div className="mb-4 flex flex-row items-end gap-2 justify-start">
+            <div className="flex basis-3/4 flex-col items-stretch justify-start gap-2">
+              <span className="h-auto w-max gap-2 text-xs/none font-medium px-1">
+                assistant
+              </span>
+              <Textarea
+                ref={(el) => {
+                  if (el) {
+                    el.style.height = "auto";
+                    el.style.height = `${el.scrollHeight}px`;
+                  }
+                }}
+                value={streamingText}
+                readOnly
+                className="message-textarea resize-none overflow-hidden w-full rounded-lg border p-4 text-sm bg-secondary text-secondary-foreground"
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {isLoading && !streamingText ? (
           <div className="flex flex-row items-end gap-2">
             <div className="flex basis-3/4 flex-col items-stretch justify-start gap-2">
               <Skeleton className="h-8 w-20 rounded" />

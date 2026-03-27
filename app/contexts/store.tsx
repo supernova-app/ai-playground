@@ -104,7 +104,7 @@ export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
     {
       id: (Date.now() + 1).toString(),
       provider: "openai",
-      model: "gpt-4o",
+      model: "gpt-5.2",
       reasoningEffort: "off",
       messages: [],
       isLoading: false,

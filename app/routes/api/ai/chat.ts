@@ -1,8 +1,8 @@
 import type { Route } from "./+types/chat";
 
-import { defaultParams, messageSchema, reasoningEfforts } from "~/config/ai";
+import { defaultParams, reasoningEfforts, uiMessageSchema } from "~/config/ai";
 
-import { streamText, wrapLanguageModel } from "ai";
+import { streamText, wrapLanguageModel, convertToModelMessages, type UIMessage } from "ai";
 
 import { z } from "zod";
 import { logMiddleware, gateway } from "~/lib/ai";
@@ -14,7 +14,7 @@ const payloadSchema = z.object({
   provider: z.string(),
   model: z.string(),
 
-  messages: z.array(messageSchema),
+  messages: z.array(uiMessageSchema),
 
   temperature: z.number().optional().default(defaultParams.temperature),
   max_tokens: z.number().int().optional().default(defaultParams.max_tokens),
@@ -56,6 +56,16 @@ function getReasoningProviderOptions(
     default:
       return undefined;
   }
+}
+
+const REASONING_MODELS: Record<string, string[]> = {
+  openai: ["gpt-5.2", "gpt-5.2-mini", "o1", "o3", "o3-mini", "o4-mini"],
+};
+
+function isReasoningModel(provider: string, model: string): boolean {
+  const models = REASONING_MODELS[provider];
+  if (!models) return false;
+  return models.some((m) => model.startsWith(m));
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -102,9 +112,10 @@ export async function action({ request }: Route.ActionArgs) {
         middleware: logMiddleware,
       }),
 
-      messages: payload.messages,
+      messages: await convertToModelMessages(payload.messages as UIMessage[]),
 
-      temperature: payload.temperature,
+      ...(!isReasoningModel(payload.provider, payload.model) &&
+        payload.reasoningEffort === "off" && { temperature: payload.temperature }),
       maxOutputTokens: payload.max_tokens,
       ...(providerOptions && { providerOptions }),
       headers: {
@@ -112,27 +123,13 @@ export async function action({ request }: Route.ActionArgs) {
       },
     });
 
-    // Stream text and append usage metadata at the end
-    const textStream = result.textStream;
-    const usagePromise = result.usage;
-    const encoder = new TextEncoder();
-
-    const stream = new ReadableStream({
-      async start(controller) {
-        for await (const chunk of textStream) {
-          controller.enqueue(encoder.encode(chunk));
+    return result.toUIMessageStreamResponse({
+      messageMetadata({ part }) {
+        if (part.type === "finish") {
+          return { usage: part.totalUsage };
         }
-        // Append usage metadata after stream completes
-        const usage = await usagePromise;
-        controller.enqueue(
-          encoder.encode(`\n__META__${JSON.stringify({ usage })}`),
-        );
-        controller.close();
+        return undefined;
       },
-    });
-
-    return new Response(stream, {
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
   } catch (error: any) {
     console.error("AI API Error:", {
