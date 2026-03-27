@@ -156,14 +156,14 @@ export default function Home() {
             content.push({
               type: "image" as const,
               image: attachment.data,
-              mimeType: attachment.mimeType,
+              mediaType: attachment.mimeType,
             });
           }
           if (attachment.type === "file") {
             content.push({
               type: "file" as const,
               data: attachment.data,
-              mimeType: attachment.mimeType,
+              mediaType: attachment.mimeType,
             });
           }
         });

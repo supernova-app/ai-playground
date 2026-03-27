@@ -10,22 +10,23 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
-import { useChat } from "ai/react";
 import { Badge } from "~/components/ui/badge";
 import { ClipboardCopy, Copy, Trash, Sigma, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport, type LanguageModelUsage } from "ai";
 
 import { useConversation, usePlaygroundStore } from "~/contexts/store";
 import {
   defaultConversationConfig,
-  modelSuggestions,
+  reasoningEfforts,
   roles,
-  SUPPORTED_PROVIDER_KEYS,
   type Message,
-  type SUPPORTED_PROVIDER_KEY,
+  type ReasoningEffort,
 } from "~/config/ai";
 import { injectVarsIntoTemplate } from "~/lib/variables";
 import { cn, seededRandomBackground } from "~/lib/utils";
+import { useModels } from "~/hooks/useModels";
 
 type ConversationProps = {
   id: string;
@@ -47,63 +48,72 @@ export function Conversation({ id }: ConversationProps) {
     conversations,
   } = usePlaygroundStore();
 
+  const { providers, getModelNames, isReasoningModel } = useModels();
+
   const currentConversation = useConversation(id);
 
-  // Track request start time
   const requestStartTime = useRef<number | null>(null);
 
-  const { isLoading, setMessages, reload } = useChat({
+  const {
+    messages: chatMessages,
+    status,
+    sendMessage,
+    setMessages,
+  } = useChat({
     id,
-    api: "/api/ai/chat",
-    generateId: () => Date.now().toString(),
-    onFinish: (message, options) => {
-      // Calculate response time
+    transport: new DefaultChatTransport({
+      api: "/api/ai/chat",
+    }),
+    onFinish: ({ message }) => {
       const responseTime = requestStartTime.current
         ? Date.now() - requestStartTime.current
         : null;
-
-      // Reset request start time
       requestStartTime.current = null;
 
-      // Extract token usage from the API response
-      const metadata = {
-        usage: options?.usage,
-        responseTime,
+
+      // Extract text from parts
+      const text = message.parts
+        ?.map((part) => (part.type === "text" ? part.text : ""))
+        .join("") || "";
+
+      const meta = message.metadata as { usage?: LanguageModelUsage } | undefined;
+
+      const assistantMessage: Message = {
+        id: message.id,
+        role: "assistant",
+        content: text,
+        metadata: {
+          responseTime: responseTime ?? undefined,
+          usage: meta?.usage,
+        },
       };
 
-      // Add metadata to the message
-      const messageWithMetadata = {
-        ...message,
-        metadata,
-      } as Message;
-
-      addMessage(id, messageWithMetadata);
-
-      // scroll to bottom
+      addMessage(id, assistantMessage);
       document.body.scrollIntoView({ behavior: "smooth", block: "end" });
     },
-    sendExtraMessageFields: true,
-    body: {
-      provider: currentConversation.provider,
-      model: currentConversation.model,
-      max_tokens: maxTokens,
-      temperature,
-    },
     onError: (error) => {
-      // Reset request start time on error
       requestStartTime.current = null;
-
       console.error(
         "Error while generating response for conversation",
         id,
         error,
       );
-
       toast.error("Error while generating response. Please try again.", {
         description: error.message,
       });
     },
   });
+
+  const isLoading = status === "streaming" || status === "submitted";
+
+  // Get the streaming assistant message text (only while actively streaming, not while submitted/waiting)
+  const streamingText = status === "streaming"
+    ? chatMessages
+        .filter((m) => m.role === "assistant")
+        .at(-1)
+        ?.parts?.map((part) => (part.type === "text" ? part.text : ""))
+        .join("") || ""
+    : null;
 
   const handleCopyResponse = (content: Message["content"]) => {
     const textContent =
@@ -131,34 +141,64 @@ export function Conversation({ id }: ConversationProps) {
       )!;
 
       if (currentState.runs.length !== prevState.runs.length) {
-        setMessages(
-          // @ts-ignore TODO
-          systemPrompt
-            ? [
-                {
-                  id: Date.now().toString(),
-                  role: "system" as const,
-                  content: injectVarsIntoTemplate(
-                    systemPrompt,
-                    systemPromptVars,
-                  ),
-                } as Message,
-                ...currentConversation.messages,
-              ]
-            : currentConversation.messages,
-        );
+        const messages = systemPrompt
+          ? [
+              {
+                id: Date.now().toString(),
+                role: "system" as const,
+                content: injectVarsIntoTemplate(
+                  systemPrompt,
+                  systemPromptVars,
+                ),
+              } as Message,
+              ...currentConversation.messages,
+            ]
+          : currentConversation.messages;
 
-        reload();
+        const toUIMessage = (m: Message) => ({
+          id: m.id || Date.now().toString(),
+          role: m.role as "system" | "user" | "assistant",
+          parts: [
+            {
+              type: "text" as const,
+              text: typeof m.content === "string" ? m.content : "",
+            },
+          ],
+        });
 
-        // Record the start time when a message is sent
+        const bodyOptions = {
+          body: {
+            provider: currentConversation.provider,
+            model: currentConversation.model,
+            max_tokens: currentState.maxTokens,
+            temperature: currentState.temperature,
+            reasoningEffort: currentConversation.reasoningEffort,
+          },
+        };
+
+        // Set history (all except last), then send the last message
+        const history = messages.slice(0, -1);
+        const lastMessage = messages.at(-1);
+
+        setMessages(history.map(toUIMessage));
+
+        if (lastMessage) {
+          const text = typeof lastMessage.content === "string"
+            ? lastMessage.content
+            : "";
+          sendMessage({ text }, bodyOptions);
+        }
+
         requestStartTime.current = Date.now();
       }
     });
-  }, [id, systemPrompt, setMessages, reload, systemPromptVars]);
+  }, [id, systemPrompt, systemPromptVars, setMessages, sendMessage]);
 
   useEffect(() => {
     updateConversation(id, { isLoading });
   }, [id, updateConversation, isLoading]);
+
+
 
   return (
     <div
@@ -178,7 +218,7 @@ export function Conversation({ id }: ConversationProps) {
             }
             onValueChange={(value) => {
               updateConversation(id, {
-                provider: value as SUPPORTED_PROVIDER_KEY,
+                provider: value,
               });
             }}
             required
@@ -187,7 +227,7 @@ export function Conversation({ id }: ConversationProps) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {SUPPORTED_PROVIDER_KEYS.map((provider) => (
+              {providers.map((provider) => (
                 <SelectItem key={provider} value={provider}>
                   {provider}
                 </SelectItem>
@@ -217,16 +257,36 @@ export function Conversation({ id }: ConversationProps) {
               {/* <SelectValue /> */}
             </SelectTrigger>
             <SelectContent>
-              {modelSuggestions[
+              {getModelNames(
                 currentConversation.provider ??
                   defaultConversationConfig.provider
-              ]?.map((model) => (
+              ).map((model) => (
                 <SelectItem key={model} value={model}>
                   {model}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+
+          {isReasoningModel(currentConversation.provider, currentConversation.model) && (
+            <Select
+              value={currentConversation.reasoningEffort}
+              onValueChange={(value) =>
+                updateConversation(id, { reasoningEffort: value as ReasoningEffort })
+              }
+            >
+              <SelectTrigger className="w-max bg-input/25 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {reasoningEfforts.map((effort) => (
+                  <SelectItem key={effort} value={effort}>
+                    {effort === "off" ? "Thinking: Off" : `Thinking: ${effort}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         <div className="flex flex-row items-center gap-2">
@@ -268,7 +328,7 @@ export function Conversation({ id }: ConversationProps) {
       </div>
 
       <div className="mt-4 flex-1">
-        {currentConversation.messages.length === 0 ? (
+        {currentConversation.messages.length === 0 && !streamingText ? (
           <div className="h-[50%] flex items-center justify-center">
             <p className="text-center text-sm font-medium">Start chatting!</p>
           </div>
@@ -345,17 +405,17 @@ export function Conversation({ id }: ConversationProps) {
                         {contentPart.type === "image" && (
                           <div className="border rounded-lg overflow-hidden bg-secondary/20 p-2">
                             <img
-                              src={`data:${contentPart.mimeType};base64,${contentPart.image}`}
+                              src={`data:${contentPart.mediaType};base64,${contentPart.image}`}
                               alt="Uploaded image"
                               className="max-h-64 w-full object-contain"
                             />
                           </div>
                         )}
                         {contentPart.type === "file" &&
-                          contentPart.mimeType.startsWith("audio/") && (
+                          contentPart.mediaType.startsWith("audio/") && (
                             <div className="border rounded-lg overflow-hidden bg-secondary/20 p-2">
                               <audio
-                                src={`data:${contentPart.mimeType};base64,${contentPart.data}`}
+                                src={`data:${contentPart.mediaType};base64,${contentPart.data}`}
                                 controls
                                 className="w-full"
                               />
@@ -374,15 +434,15 @@ export function Conversation({ id }: ConversationProps) {
                     <Badge
                       variant="outline"
                       className="flex items-center gap-2"
-                      title="Token usage (prompt/completion)"
+                      title="Token usage (input/output)"
                     >
                       <Sigma className="h-3 w-3" />
                       {message.metadata.usage.totalTokens || 0}
-                      {message.metadata.usage.promptTokens &&
-                        message.metadata.usage.completionTokens && (
+                      {message.metadata.usage.inputTokens != null &&
+                        message.metadata.usage.outputTokens != null && (
                           <span className="text-xs opacity-70">
-                            ({message.metadata.usage.promptTokens}/
-                            {message.metadata.usage.completionTokens})
+                            ({message.metadata.usage.inputTokens}/
+                            {message.metadata.usage.outputTokens})
                           </span>
                         )}
                     </Badge>
@@ -421,7 +481,29 @@ export function Conversation({ id }: ConversationProps) {
           </div>
         ))}
 
-        {currentConversation.isLoading ? (
+        {/* Streaming assistant message */}
+        {streamingText ? (
+          <div className="mb-4 flex flex-row items-end gap-2 justify-start">
+            <div className="flex basis-3/4 flex-col items-stretch justify-start gap-2">
+              <span className="h-auto w-max gap-2 text-xs/none font-medium px-1">
+                assistant
+              </span>
+              <Textarea
+                ref={(el) => {
+                  if (el) {
+                    el.style.height = "auto";
+                    el.style.height = `${el.scrollHeight}px`;
+                  }
+                }}
+                value={streamingText}
+                readOnly
+                className="message-textarea resize-none overflow-hidden w-full rounded-lg border p-4 text-sm bg-secondary text-secondary-foreground"
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {isLoading && !streamingText ? (
           <div className="flex flex-row items-end gap-2">
             <div className="flex basis-3/4 flex-col items-stretch justify-start gap-2">
               <Skeleton className="h-8 w-20 rounded" />
