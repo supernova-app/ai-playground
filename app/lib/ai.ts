@@ -5,7 +5,7 @@ import { createGateway } from "@ai-sdk/gateway";
 import { db, schema } from "./db";
 
 export const gateway = createGateway({
-  apiKey: process.env.AI_GATEWAY_API_KEY,
+  apiKey: process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN,
 });
 
 export const logMiddleware: LanguageModelMiddleware = {
