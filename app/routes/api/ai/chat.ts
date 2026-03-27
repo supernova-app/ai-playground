@@ -7,6 +7,7 @@ import { streamText, wrapLanguageModel, convertToModelMessages, type UIMessage }
 import { z } from "zod";
 import { logMiddleware, gateway } from "~/lib/ai";
 import { auth } from "~/lib/auth.server";
+import { isReasoningModel } from "~/lib/models";
 
 export const maxDuration = 30;
 
@@ -56,16 +57,6 @@ function getReasoningProviderOptions(
     default:
       return undefined;
   }
-}
-
-const REASONING_MODELS: Record<string, string[]> = {
-  openai: ["gpt-5.2", "gpt-5.2-mini", "o1", "o3", "o3-mini", "o4-mini"],
-};
-
-function isReasoningModel(provider: string, model: string): boolean {
-  const models = REASONING_MODELS[provider];
-  if (!models) return false;
-  return models.some((m) => model.startsWith(m));
 }
 
 export async function action({ request }: Route.ActionArgs) {

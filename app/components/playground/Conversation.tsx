@@ -48,7 +48,7 @@ export function Conversation({ id }: ConversationProps) {
     conversations,
   } = usePlaygroundStore();
 
-  const { models, providers } = useModels();
+  const { providers, getModelNames, isReasoningModel } = useModels();
 
   const currentConversation = useConversation(id);
 
@@ -257,10 +257,10 @@ export function Conversation({ id }: ConversationProps) {
               {/* <SelectValue /> */}
             </SelectTrigger>
             <SelectContent>
-              {(models[
+              {getModelNames(
                 currentConversation.provider ??
                   defaultConversationConfig.provider
-              ] ?? []).map((model) => (
+              ).map((model) => (
                 <SelectItem key={model} value={model}>
                   {model}
                 </SelectItem>
@@ -268,23 +268,25 @@ export function Conversation({ id }: ConversationProps) {
             </SelectContent>
           </Select>
 
-          <Select
-            value={currentConversation.reasoningEffort}
-            onValueChange={(value) =>
-              updateConversation(id, { reasoningEffort: value as ReasoningEffort })
-            }
-          >
-            <SelectTrigger className="w-max bg-input/25 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {reasoningEfforts.map((effort) => (
-                <SelectItem key={effort} value={effort}>
-                  {effort === "off" ? "Thinking: Off" : `Thinking: ${effort}`}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {isReasoningModel(currentConversation.provider, currentConversation.model) && (
+            <Select
+              value={currentConversation.reasoningEffort}
+              onValueChange={(value) =>
+                updateConversation(id, { reasoningEffort: value as ReasoningEffort })
+              }
+            >
+              <SelectTrigger className="w-max bg-input/25 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {reasoningEfforts.map((effort) => (
+                  <SelectItem key={effort} value={effort}>
+                    {effort === "off" ? "Thinking: Off" : `Thinking: ${effort}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         <div className="flex flex-row items-center gap-2">
