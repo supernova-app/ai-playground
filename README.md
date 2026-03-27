@@ -28,7 +28,7 @@ The interface is intentionally simple. Enter a prompt once, see how different mo
 
 We think more AI companies could benefit from faster prompt testing. And we want others to help make it better.
 
-Running your own instance means full control over data and costs. You only pay for the API calls you make through the Vercel AI Gateway.
+Running your own instance means full control over data and costs. You only pay for the API calls you make through the Vercel AI Gateway. On Vercel deployments, OIDC authentication is used as a fallback if no API key is set.
 
 ## Setup
 
