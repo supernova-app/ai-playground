@@ -349,6 +349,15 @@ export default function Home() {
             >
               GitHub
             </Link>
+            ,{" "}
+            <Link
+              to="https://vercel.com/ai-gateway/models"
+              className="hover:text-foreground transition-colors"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Models
+            </Link>
             )
           </span>
 

@@ -89,7 +89,6 @@ export function Conversation({ id }: ConversationProps) {
       };
 
       addMessage(id, assistantMessage);
-      document.body.scrollIntoView({ behavior: "smooth", block: "end" });
     },
     onError: (error) => {
       requestStartTime.current = null;
@@ -212,19 +211,26 @@ export function Conversation({ id }: ConversationProps) {
     >
       <div className="flex flex-row items-center justify-between">
         <div className="flex flex-row items-center justify-start gap-0.5 flex-1 min-w-[48] max-w-[60%]">
-          <Select
-            value={
-              currentConversation.provider ?? defaultConversationConfig.provider
-            }
-            onValueChange={(value) => {
-              updateConversation(id, {
-                provider: value,
-              });
+          <Input
+            type="text"
+            placeholder="Provider"
+            value={currentConversation.provider ?? defaultConversationConfig.provider}
+            onChange={(e) => {
+              updateConversation(id, { provider: e.currentTarget.value });
             }}
+            className="w-24 invalid:border-red-500 bg-input/25"
+            minLength={1}
             required
+          />
+
+          <Select
+            value={currentConversation.provider ?? defaultConversationConfig.provider}
+            onValueChange={(value) => {
+              updateConversation(id, { provider: value });
+            }}
           >
-            <SelectTrigger className="w-max bg-input/25">
-              <SelectValue />
+            <SelectTrigger className="w-max">
+              {/* <SelectValue /> */}
             </SelectTrigger>
             <SelectContent>
               {providers.map((provider) => (
