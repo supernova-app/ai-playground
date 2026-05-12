@@ -34,6 +34,7 @@ import {
 import { Switch } from "~/components/ui/switch";
 import { Textarea } from "~/components/ui/textarea";
 import {
+  ArrowDown,
   ListRestart,
   Plus,
   Settings,
@@ -295,6 +296,39 @@ export default function Home() {
     });
   }, [conversations]);
 
+  const mainRef = useRef<HTMLElement>(null);
+  const [showScrollToLatest, setShowScrollToLatest] = useState(false);
+
+  useEffect(() => {
+    const main = mainRef.current;
+    if (!main) return;
+
+    const update = () => {
+      const distanceFromBottom =
+        main.scrollHeight - main.scrollTop - main.clientHeight;
+      const isScrollable = main.scrollHeight - main.clientHeight > 16;
+      setShowScrollToLatest(isScrollable && distanceFromBottom > 64);
+    };
+
+    update();
+    main.addEventListener("scroll", update, { passive: true });
+
+    const resizeObserver = new ResizeObserver(update);
+    resizeObserver.observe(main);
+    Array.from(main.children).forEach((child) => resizeObserver.observe(child));
+
+    return () => {
+      main.removeEventListener("scroll", update);
+      resizeObserver.disconnect();
+    };
+  }, [conversations.length]);
+
+  const scrollToLatest = () => {
+    const main = mainRef.current;
+    if (!main) return;
+    main.scrollTo({ top: main.scrollHeight, behavior: "smooth" });
+  };
+
   return (
     <div
       className={cn(
@@ -489,7 +523,7 @@ export default function Home() {
         </div>
       </div>
 
-      <main className="flex-1 gap-4 overflow-auto p-4 pt-0">
+      <main ref={mainRef} className="flex-1 gap-4 overflow-auto p-4 pt-0">
         <div className="grid gap-2 sticky top-0 bg-background z-10">
           <div className="flex flex-row items-center justify-between">
             <Label htmlFor="system-prompt">System Prompt</Label>
@@ -586,125 +620,141 @@ export default function Home() {
           ))}
         </div>
 
-        <form
-          onSubmit={handleSendMessage}
-          className="sticky bottom-0 mx-auto mt-4 max-w-5xl shrink-0 overflow-hidden rounded-lg ring-1 ring-border bg-card focus-within:ring-ring"
-        >
-          <fieldset disabled={isLoading}>
-            <Label htmlFor="message" className="sr-only">
-              Message
-            </Label>
+        <div className="sticky bottom-0 mx-auto mt-4 flex max-w-5xl shrink-0 flex-col items-center gap-2">
+          {showScrollToLatest ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={scrollToLatest}
+              className="rounded-full bg-card shadow-md"
+              title="Scroll to latest message"
+              aria-label="Scroll to latest message"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </Button>
+          ) : null}
 
-            <Textarea
-              ref={textareaRef}
-              id="message"
-              placeholder="Type your message here..."
-              className="min-h-12 flex-1 resize-none border-0 p-3 shadow-none focus-visible:ring-0 bg-input/50"
-              value={pendingMessage.text}
-              onChange={(e) => setPendingMessageText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              style={{ maxHeight: "20vh" }}
-              autoFocus
-            />
+          <form
+            onSubmit={handleSendMessage}
+            className="w-full overflow-hidden rounded-lg ring-1 ring-border bg-card focus-within:ring-ring"
+          >
+            <fieldset disabled={isLoading}>
+              <Label htmlFor="message" className="sr-only">
+                Message
+              </Label>
 
-            {pendingMessage.attachments.length > 0 && (
-              <div className="px-3 py-2 border-t">
-                <div className="flex flex-wrap items-center gap-2">
-                  {pendingMessage.attachments.map((attachment) => (
-                    <div key={attachment.id} className="relative">
-                      {attachment.type === "image" ? (
-                        <img
-                          src={`data:${attachment.mimeType};base64,${attachment.data}`}
-                          alt="Attachment"
-                          className="h-20 w-20 object-contain rounded"
-                        />
-                      ) : null}
-                      {attachment.type === "file"
-                        ? attachment.mimeType.startsWith("audio/") && (
-                            <div className="flex flex-col items-center gap-1">
-                              <audio
-                                src={`data:${attachment.mimeType};base64,${attachment.data}`}
-                                controls
-                              />
-                            </div>
-                          )
-                        : null}
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="xs"
-                        className="absolute -top-0 -right-2 p-0.5 h-auto rounded-full"
-                        onClick={() => removeAttachment(attachment.id)}
-                      >
-                        <X className="h-2 w-2" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+              <Textarea
+                ref={textareaRef}
+                id="message"
+                placeholder="Type your message here..."
+                className="min-h-12 flex-1 resize-none border-0 p-3 shadow-none focus-visible:ring-0 bg-input/50"
+                value={pendingMessage.text}
+                onChange={(e) => setPendingMessageText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                style={{ maxHeight: "20vh" }}
+                autoFocus
+              />
 
-            <div className="flex items-center justify-between px-3 py-2">
-              <div className="flex items-center gap-2">
-                <Select
-                  value={pendingMessage.role}
-                  onValueChange={(value) =>
-                    setPendingMessageRole(value as Message["role"])
-                  }
-                  disabled={pendingMessage.attachments.length > 0}
-                >
-                  <SelectTrigger className="w-max">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roles.map((role) => (
-                      <SelectItem key={role} value={role}>
-                        {role}
-                      </SelectItem>
+              {pendingMessage.attachments.length > 0 && (
+                <div className="px-3 py-2 border-t">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {pendingMessage.attachments.map((attachment) => (
+                      <div key={attachment.id} className="relative">
+                        {attachment.type === "image" ? (
+                          <img
+                            src={`data:${attachment.mimeType};base64,${attachment.data}`}
+                            alt="Attachment"
+                            className="h-20 w-20 object-contain rounded"
+                          />
+                        ) : null}
+                        {attachment.type === "file"
+                          ? attachment.mimeType.startsWith("audio/") && (
+                              <div className="flex flex-col items-center gap-1">
+                                <audio
+                                  src={`data:${attachment.mimeType};base64,${attachment.data}`}
+                                  controls
+                                />
+                              </div>
+                            )
+                          : null}
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="xs"
+                          className="absolute -top-0 -right-2 p-0.5 h-auto rounded-full"
+                          onClick={() => removeAttachment(attachment.id)}
+                        >
+                          <X className="h-2 w-2" />
+                        </Button>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                </div>
+              )}
 
-                <Input
-                  type="file"
-                  id="image-upload"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                />
-
-                <Button
-                  variant="outline"
-                  size="icon"
-                  disabled={pendingMessage.attachments.length > 0}
-                  asChild
-                >
-                  <Label
-                    htmlFor={
-                      pendingMessage.attachments.length > 0
-                        ? "image-upload-disabled"
-                        : "image-upload"
+              <div className="flex items-center justify-between px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={pendingMessage.role}
+                    onValueChange={(value) =>
+                      setPendingMessageRole(value as Message["role"])
                     }
-                    aria-disabled={pendingMessage.attachments.length > 0}
-                    title="Upload Image"
+                    disabled={pendingMessage.attachments.length > 0}
                   >
-                    <Image className="h-4 w-4" />
-                  </Label>
+                    <SelectTrigger className="w-max">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roles.map((role) => (
+                        <SelectItem key={role} value={role}>
+                          {role}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Input
+                    type="file"
+                    id="image-upload"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                  />
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    disabled={pendingMessage.attachments.length > 0}
+                    asChild
+                  >
+                    <Label
+                      htmlFor={
+                        pendingMessage.attachments.length > 0
+                          ? "image-upload-disabled"
+                          : "image-upload"
+                      }
+                      aria-disabled={pendingMessage.attachments.length > 0}
+                      title="Upload Image"
+                    >
+                      <Image className="h-4 w-4" />
+                    </Label>
+                  </Button>
+
+                  <AudioRecorder
+                    onAudioCaptured={handleAudioCaptured}
+                    disabled={pendingMessage.attachments.length > 0}
+                  />
+                </div>
+
+                <Button type="submit" size="sm" className="ml-2 gap-1.5">
+                  <span>Send</span>
+                  <span className="scale-75">⌘+⏎</span>
                 </Button>
-
-                <AudioRecorder
-                  onAudioCaptured={handleAudioCaptured}
-                  disabled={pendingMessage.attachments.length > 0}
-                />
               </div>
-
-              <Button type="submit" size="sm" className="ml-2 gap-1.5">
-                <span>Send</span>
-                <span className="scale-75">⌘+⏎</span>
-              </Button>
-            </div>
-          </fieldset>
-        </form>
+            </fieldset>
+          </form>
+        </div>
       </main>
     </div>
   );
