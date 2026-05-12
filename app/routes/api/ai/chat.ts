@@ -2,7 +2,12 @@ import type { Route } from "./+types/chat";
 
 import { defaultParams, reasoningEfforts, uiMessageSchema } from "~/config/ai";
 
-import { streamText, wrapLanguageModel, convertToModelMessages, type UIMessage } from "ai";
+import {
+  streamText,
+  wrapLanguageModel,
+  convertToModelMessages,
+  type UIMessage,
+} from "ai";
 
 import { z } from "zod";
 import { logMiddleware, gateway } from "~/lib/ai";
@@ -22,8 +27,27 @@ const payloadSchema = z.object({
   reasoningEffort: z.enum(reasoningEfforts).optional().default("off"),
 });
 
+const THINKING_EFFORT_TO_BUDGET: Record<string, number> = {
+  low: 1024,
+  medium: 8192,
+  high: 24576,
+};
+
+function isGemini3Model(model: string) {
+  return /^gemini-3/.test(model);
+}
+
+function getGoogleThinkingConfig(model: string, effort: string) {
+  if (isGemini3Model(model)) {
+    return { thinkingLevel: effort };
+  }
+
+  return { thinkingBudget: THINKING_EFFORT_TO_BUDGET[effort] ?? 8192 };
+}
+
 function getReasoningProviderOptions(
   provider: string,
+  model: string,
   effort: string,
 ): Record<string, any> | undefined {
   if (effort === "off") {
@@ -52,7 +76,7 @@ function getReasoningProviderOptions(
       };
     case "google":
       return {
-        google: { thinkingConfig: { thinkingLevel: effort } },
+        google: { thinkingConfig: getGoogleThinkingConfig(model, effort) },
       };
     default:
       return undefined;
@@ -93,6 +117,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   const providerOptions = getReasoningProviderOptions(
     payload.provider,
+    payload.model,
     payload.reasoningEffort,
   );
 
@@ -106,7 +131,9 @@ export async function action({ request }: Route.ActionArgs) {
       messages: await convertToModelMessages(payload.messages as UIMessage[]),
 
       ...(!isReasoningModel(payload.provider, payload.model) &&
-        payload.reasoningEffort === "off" && { temperature: payload.temperature }),
+        payload.reasoningEffort === "off" && {
+          temperature: payload.temperature,
+        }),
       maxOutputTokens: payload.max_tokens,
       ...(providerOptions && { providerOptions }),
       headers: {
