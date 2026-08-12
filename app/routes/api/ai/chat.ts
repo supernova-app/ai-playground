@@ -12,7 +12,10 @@ import {
 import { z } from "zod";
 import { logMiddleware, gateway } from "~/lib/ai";
 import { auth } from "~/lib/auth.server";
-import { isEmailAllowed } from "~/lib/email-allowlist.server";
+import {
+  EMAIL_DOMAIN_RESTRICTION_MESSAGE,
+  isEmailAllowed,
+} from "~/lib/email-allowlist.server";
 import { isReasoningModel } from "~/lib/models";
 
 export const maxDuration = 30;
@@ -100,7 +103,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (!isEmailAllowed(session.user.email)) {
     return Response.json(
-      { error: "Access restricted to approved email domains" },
+      { error: EMAIL_DOMAIN_RESTRICTION_MESSAGE },
       {
         status: 403,
       },
