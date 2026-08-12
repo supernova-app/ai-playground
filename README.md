@@ -47,6 +47,9 @@ cp .env.example .env
 # Edit .env
 ```
 
+Set `ALLOWED_EMAIL_DOMAINS` to a comma-separated list of approved email
+domains. Leaving it unset allows any Google account.
+
 3. Run migrations (mainly for the authentication):
 
 ```bash

@@ -819,7 +819,12 @@ function AuthDialog() {
       }
     } catch (error) {
       console.error("Login failed:", error);
-      toast.error("Login failed. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "";
+      toast.error(
+        errorMessage.includes("Access restricted")
+          ? "Access restricted to approved email domains."
+          : "Login failed. Please try again.",
+      );
     } finally {
       setIsLoggingIn(false);
     }
