@@ -1,23 +1,23 @@
 export type ModelInfo = {
   name: string;
   tags: string[];
+  released?: number;
 };
 
 export type ModelsData = Record<string, ModelInfo[]>;
+
+const GATEWAY_MODELS_URL = "https://ai-gateway.vercel.sh/v1/models";
 
 let cachedModels: ModelsData | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export async function fetchAndCacheModels() {
-  const response = await fetch(
-    "https://ai-gateway.vercel.sh/v1/models",
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN}`,
-      },
+  const response = await fetch(GATEWAY_MODELS_URL, {
+    headers: {
+      Authorization: `Bearer ${process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN}`,
     },
-  );
+  });
 
   if (!response.ok) {
     throw new Error(`Gateway returned ${response.status}`);
@@ -33,6 +33,8 @@ export async function fetchAndCacheModels() {
 
     if (slashIndex === -1) continue;
 
+    if (model.type && model.type !== "language") continue;
+
     const provider = id.substring(0, slashIndex);
     const modelName = id.substring(slashIndex + 1);
 
@@ -42,6 +44,7 @@ export async function fetchAndCacheModels() {
     grouped[provider].push({
       name: modelName,
       tags: model.tags ?? [],
+      ...(typeof model.released === "number" && { released: model.released }),
     });
   }
 
@@ -66,7 +69,12 @@ export async function getModels() {
     return cachedModels;
   }
 
-  return fetchAndCacheModels();
+  try {
+    return await fetchAndCacheModels();
+  } catch (error) {
+    if (cachedModels) return cachedModels;
+    throw error;
+  }
 }
 
 export function getCachedModels() {

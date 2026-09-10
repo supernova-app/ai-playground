@@ -48,9 +48,45 @@ export function Conversation({ id }: ConversationProps) {
     conversations,
   } = usePlaygroundStore();
 
-  const { providers, getModelNames, isReasoningModel } = useModels();
+  const {
+    providers,
+    isLoading: isLoadingModels,
+    getModelNames,
+    getLatestModelName,
+    isReasoningModel,
+  } = useModels();
 
   const currentConversation = useConversation(id);
+
+  const provider =
+    currentConversation.provider ?? defaultConversationConfig.provider;
+  const model = currentConversation.model ?? defaultConversationConfig.model;
+
+  const providerModels = getModelNames(provider);
+
+  function handleProviderChange(nextProvider: string) {
+    const nextProviderModels = getModelNames(nextProvider);
+    const nextModel = nextProviderModels.includes(model)
+      ? model
+      : (getLatestModelName(nextProvider) ?? model);
+
+    updateConversation(id, {
+      provider: nextProvider,
+      model: nextModel,
+      ...(!isReasoningModel(nextProvider, nextModel) && {
+        reasoningEffort: "off" as const,
+      }),
+    });
+  }
+
+  function handleModelChange(nextModel: string) {
+    updateConversation(id, {
+      model: nextModel,
+      ...(!isReasoningModel(provider, nextModel) && {
+        reasoningEffort: "off" as const,
+      }),
+    });
+  }
 
   const requestStartTime = useRef<number | null>(null);
 
@@ -214,7 +250,7 @@ export function Conversation({ id }: ConversationProps) {
           <Input
             type="text"
             placeholder="Provider"
-            value={currentConversation.provider ?? defaultConversationConfig.provider}
+            value={provider}
             onChange={(e) => {
               updateConversation(id, { provider: e.currentTarget.value });
             }}
@@ -223,19 +259,19 @@ export function Conversation({ id }: ConversationProps) {
             required
           />
 
-          <Select
-            value={currentConversation.provider ?? defaultConversationConfig.provider}
-            onValueChange={(value) => {
-              updateConversation(id, { provider: value });
-            }}
-          >
-            <SelectTrigger className="w-max">
-              {/* <SelectValue /> */}
-            </SelectTrigger>
+          <Select value={provider} onValueChange={handleProviderChange}>
+            <SelectTrigger
+              className="w-max shrink-0 bg-input/25 px-2"
+              aria-label="Pick a provider"
+              title={
+                isLoadingModels ? "Loading providers…" : "Pick a provider"
+              }
+              disabled={isLoadingModels || providers.length === 0}
+            />
             <SelectContent>
-              {providers.map((provider) => (
-                <SelectItem key={provider} value={provider}>
-                  {provider}
+              {providers.map((providerName) => (
+                <SelectItem key={providerName} value={providerName}>
+                  {providerName}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -244,7 +280,7 @@ export function Conversation({ id }: ConversationProps) {
           <Input
             type="text"
             placeholder="Model name here... Eg: gpt-4o"
-            value={currentConversation.model ?? defaultConversationConfig.model}
+            value={model}
             onChange={(e) => {
               updateConversation(id, { model: e.currentTarget.value });
             }}
@@ -253,28 +289,29 @@ export function Conversation({ id }: ConversationProps) {
             required
           />
 
-          <Select
-            value={currentConversation.model ?? defaultConversationConfig.model}
-            onValueChange={(value) => {
-              updateConversation(id, { model: value });
-            }}
-          >
-            <SelectTrigger className="w-max">
-              {/* <SelectValue /> */}
-            </SelectTrigger>
+          <Select value={model} onValueChange={handleModelChange}>
+            <SelectTrigger
+              className="w-max shrink-0 bg-input/25 px-2"
+              aria-label="Pick a model"
+              title={
+                isLoadingModels
+                  ? "Loading models…"
+                  : providerModels.length === 0
+                    ? `No models available for "${provider}"`
+                    : "Pick a model"
+              }
+              disabled={isLoadingModels || providerModels.length === 0}
+            />
             <SelectContent>
-              {getModelNames(
-                currentConversation.provider ??
-                  defaultConversationConfig.provider
-              ).map((model) => (
-                <SelectItem key={model} value={model}>
-                  {model}
+              {providerModels.map((modelName) => (
+                <SelectItem key={modelName} value={modelName}>
+                  {modelName}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          {isReasoningModel(currentConversation.provider, currentConversation.model) && (
+          {isReasoningModel(provider, model) && (
             <Select
               value={currentConversation.reasoningEffort}
               onValueChange={(value) =>

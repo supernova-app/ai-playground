@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 
-type ModelInfo = {
-  name: string;
-  tags: string[];
-};
+import type { ModelInfo, ModelsData } from "~/lib/models";
 
-type ModelsData = Record<string, ModelInfo[]>;
+export type { ModelInfo, ModelsData };
 
 let cachedData: ModelsData | null = null;
 let fetchPromise: Promise<ModelsData> | null = null;
+
+const subscribers = new Set<(data: ModelsData) => void>();
 
 async function fetchModels() {
   const response = await fetch("/api/ai/models");
@@ -16,6 +15,22 @@ async function fetchModels() {
     throw new Error("Failed to fetch models");
   }
   return response.json();
+}
+
+function loadModels() {
+  if (!fetchPromise) {
+    fetchPromise = fetchModels()
+      .then((data) => {
+        cachedData = data;
+        subscribers.forEach((notify) => notify(data));
+        return data;
+      })
+      .finally(() => {
+        fetchPromise = null;
+      });
+  }
+
+  return fetchPromise;
 }
 
 export function useModels() {
@@ -30,22 +45,25 @@ export function useModels() {
       return;
     }
 
-    if (!fetchPromise) {
-      fetchPromise = fetchModels();
-    }
+    subscribers.add(setModels);
 
-    fetchPromise
-      .then((data) => {
-        cachedData = data;
-        setModels(data);
+    let active = true;
+
+    loadModels()
+      .then(() => {
+        if (active) setError(null);
       })
       .catch((err) => {
-        setError(err.message);
+        if (active) setError(err.message);
       })
       .finally(() => {
-        setIsLoading(false);
-        fetchPromise = null;
+        if (active) setIsLoading(false);
       });
+
+    return () => {
+      active = false;
+      subscribers.delete(setModels);
+    };
   }, []);
 
   const providers = Object.keys(models).sort();
@@ -59,5 +77,22 @@ export function useModels() {
     return entry?.tags.includes("reasoning") ?? false;
   }
 
-  return { models, providers, isLoading, error, getModelNames, isReasoningModel };
+  function getLatestModelName(provider: string) {
+    const entries = models[provider] ?? [];
+    if (entries.length === 0) return undefined;
+
+    return entries.reduce((latest, entry) =>
+      (entry.released ?? 0) > (latest.released ?? 0) ? entry : latest,
+    ).name;
+  }
+
+  return {
+    models,
+    providers,
+    isLoading,
+    error,
+    getModelNames,
+    getLatestModelName,
+    isReasoningModel,
+  };
 }
