@@ -12,7 +12,7 @@ import {
 import { z } from "zod";
 import { logMiddleware, gateway } from "~/lib/ai";
 import { auth } from "~/lib/auth.server";
-import { isReasoningModel } from "~/lib/models";
+import { getModelTags } from "~/lib/models";
 
 export const maxDuration = 30;
 
@@ -115,10 +115,19 @@ export async function action({ request }: Route.ActionArgs) {
   // Gateway model ID format: provider/model
   const modelId = `${payload.provider}/${payload.model}`;
 
+  const modelTags = getModelTags(payload.provider, payload.model);
+  const isReasoningModel = modelTags?.includes("reasoning") ?? false;
+
+  // A hand-typed provider/model hides the effort selector without clearing the
+  // stored effort, so drop the effort for models the gateway tags as
+  // non-reasoning. Models missing from the list keep whatever was sent.
+  const reasoningEffort =
+    modelTags && !isReasoningModel ? "off" : payload.reasoningEffort;
+
   const providerOptions = getReasoningProviderOptions(
     payload.provider,
     payload.model,
-    payload.reasoningEffort,
+    reasoningEffort,
   );
 
   try {
@@ -130,8 +139,8 @@ export async function action({ request }: Route.ActionArgs) {
 
       messages: await convertToModelMessages(payload.messages as UIMessage[]),
 
-      ...(!isReasoningModel(payload.provider, payload.model) &&
-        payload.reasoningEffort === "off" && {
+      ...(!isReasoningModel &&
+        reasoningEffort === "off" && {
           temperature: payload.temperature,
         }),
       maxOutputTokens: payload.max_tokens,

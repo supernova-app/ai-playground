@@ -11,6 +11,7 @@ const GATEWAY_MODELS_URL = "https://ai-gateway.vercel.sh/v1/models";
 let cachedModels: ModelsData | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const STALE_CACHE_MAX_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export async function fetchAndCacheModels() {
   const response = await fetch(GATEWAY_MODELS_URL, {
@@ -71,21 +72,27 @@ export async function getModels() {
 
   try {
     return await fetchAndCacheModels();
-  } catch (error) {
-    if (cachedModels) return cachedModels;
+  } catch (error: any) {
+    const staleness = now - cacheTimestamp;
+
+    if (cachedModels && staleness < STALE_CACHE_MAX_MS) {
+      console.warn(
+        `Serving model list stale by ${Math.round(staleness / 1000)}s:`,
+        error?.message,
+      );
+      return cachedModels;
+    }
+
     throw error;
   }
 }
 
-export function getCachedModels() {
-  return cachedModels;
+export function getModelTags(provider: string, model: string) {
+  return cachedModels?.[provider]?.find((m) => m.name === model)?.tags;
 }
 
 export function isReasoningModel(provider: string, model: string) {
-  const providerModels = cachedModels?.[provider];
-  if (!providerModels) return false;
-  const entry = providerModels.find((m) => m.name === model);
-  return entry?.tags.includes("reasoning") ?? false;
+  return getModelTags(provider, model)?.includes("reasoning") ?? false;
 }
 
 // Preload cache at server startup
