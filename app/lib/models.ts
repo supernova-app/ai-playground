@@ -14,11 +14,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const STALE_CACHE_MAX_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export async function fetchAndCacheModels() {
-  const response = await fetch(GATEWAY_MODELS_URL, {
-    headers: {
-      Authorization: `Bearer ${process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN}`,
-    },
-  });
+  const response = await fetch(GATEWAY_MODELS_URL);
 
   if (!response.ok) {
     throw new Error(`Gateway returned ${response.status}`);
