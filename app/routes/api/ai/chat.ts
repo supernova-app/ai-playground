@@ -12,6 +12,7 @@ import {
 import { z } from "zod";
 import { logMiddleware, gateway } from "~/lib/ai";
 import { auth } from "~/lib/auth.server";
+import { isEmailBlocked } from "~/lib/blocked-emails.server";
 import { getModelTags } from "~/lib/models";
 
 export const maxDuration = 30;
@@ -95,6 +96,12 @@ export async function action({ request }: Route.ActionArgs) {
         status: 401,
       },
     );
+  }
+
+  // Sessions created before an email was blocked stay valid until they
+  // expire, so chat checks the blocklist on every request too.
+  if (isEmailBlocked(session.user.email)) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const jsonBody = await request.json();
