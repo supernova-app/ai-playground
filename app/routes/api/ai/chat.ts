@@ -13,7 +13,7 @@ import { z } from "zod";
 import { logMiddleware, gateway } from "~/lib/ai";
 import { auth } from "~/lib/auth.server";
 import { isEmailBlocked } from "~/lib/blocked-emails.server";
-import { getModelTags } from "~/lib/models";
+import { getModels, getModelTags } from "~/lib/models";
 
 export const maxDuration = 30;
 
@@ -122,6 +122,13 @@ export async function action({ request }: Route.ActionArgs) {
   // Gateway model ID format: provider/model
   const modelId = `${payload.provider}/${payload.model}`;
 
+  // A cold serverless instance may not have the model list cached yet, which
+  // would make every model look untagged (and send temperature to reasoning
+  // models), so make sure it is loaded first.
+  await getModels().catch((error) =>
+    console.error("Failed to load models for chat:", error?.message),
+  );
+
   const modelTags = getModelTags(payload.provider, payload.model);
   const isReasoningModel = modelTags?.includes("reasoning") ?? false;
 
@@ -158,6 +165,10 @@ export async function action({ request }: Route.ActionArgs) {
     });
 
     return result.toUIMessageStreamResponse({
+      // The default hides every error behind "An error occurred.", which
+      // leaves users guessing when e.g. a model ID is wrong.
+      onError: (error) =>
+        error instanceof Error ? error.message : "Unknown error",
       messageMetadata({ part }) {
         if (part.type === "finish") {
           return { usage: part.totalUsage };

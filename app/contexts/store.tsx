@@ -224,11 +224,12 @@ export const usePlaygroundStore = create<PlaygroundStore>((set) => ({
       );
       if (!conversationToDuplicate) return state;
 
-      // Generate new unique IDs for the duplicated messages
+      // Generate new unique IDs for the duplicated messages. They must differ
+      // from each other, since editing or deleting a message matches by ID.
       const duplicatedMessages = conversationToDuplicate.messages.map(
         (message) => ({
           ...message,
-          id: Date.now().toString(),
+          id: crypto.randomUUID(),
         }),
       );
 
