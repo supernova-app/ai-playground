@@ -3,10 +3,31 @@ import { type LanguageModelMiddleware } from "ai";
 import { createGateway } from "@ai-sdk/gateway";
 
 import { db, schema } from "./db";
+import type { NewLog } from "./db/schema";
 
 export const gateway = createGateway({
   apiKey: process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN,
 });
+
+// Logging is best-effort: a failed insert must not fail the user's request,
+// and in a stream it would error the response after the reply was sent.
+async function saveLog(
+  userId: string,
+  request: NewLog["request"],
+  response: NewLog["response"],
+) {
+  try {
+    await db.insert(schema.llmLog).values([
+      {
+        userId,
+        request,
+        response,
+      },
+    ]);
+  } catch (error: any) {
+    console.error("Failed to save LLM log:", error?.message);
+  }
+}
 
 export const logMiddleware: LanguageModelMiddleware = {
   specificationVersion: "v3",
@@ -34,13 +55,7 @@ export const logMiddleware: LanguageModelMiddleware = {
       },
     };
 
-    await db.insert(schema.llmLog).values([
-      {
-        userId: params.headers!["user-id"]!,
-        request: logRequest,
-        response: logResponse,
-      },
-    ]);
+    await saveLog(params.headers!["user-id"]!, logRequest, logResponse);
 
     return result;
   },
@@ -73,13 +88,7 @@ export const logMiddleware: LanguageModelMiddleware = {
       },
 
       async flush() {
-        await db.insert(schema.llmLog).values([
-          {
-            userId: params.headers!["user-id"]!,
-            request: logRequest,
-            response: logResponse,
-          },
-        ]);
+        await saveLog(params.headers!["user-id"]!, logRequest, logResponse);
       },
     });
 

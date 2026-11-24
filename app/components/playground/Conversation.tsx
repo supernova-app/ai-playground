@@ -14,7 +14,11 @@ import { Badge } from "~/components/ui/badge";
 import { ClipboardCopy, Copy, Trash, Sigma, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type LanguageModelUsage } from "ai";
+import {
+  DefaultChatTransport,
+  type LanguageModelUsage,
+  type UIMessage,
+} from "ai";
 
 import { useConversation, usePlaygroundStore } from "~/contexts/store";
 import {
@@ -90,6 +94,10 @@ export function Conversation({ id }: ConversationProps) {
 
   const requestStartTime = useRef<number | null>(null);
 
+  // When the history ends with an assistant message, the SDK streams the reply
+  // into that message, so remember how many parts it had to show only new ones.
+  const replyPartsOffset = useRef(0);
+
   const {
     messages: chatMessages,
     status,
@@ -100,22 +108,30 @@ export function Conversation({ id }: ConversationProps) {
     transport: new DefaultChatTransport({
       api: "/api/ai/chat",
     }),
-    onFinish: ({ message }) => {
+    onFinish: ({ message, isError, isAbort }) => {
       const responseTime = requestStartTime.current
         ? Date.now() - requestStartTime.current
         : null;
       requestStartTime.current = null;
 
+      // onFinish also fires after a failed or aborted request; onError already
+      // reports failures, so don't add an empty assistant reply for them.
+      if (isError || isAbort) return;
 
       // Extract text from parts
-      const text = message.parts
-        ?.map((part) => (part.type === "text" ? part.text : ""))
-        .join("") || "";
+      const text =
+        message.parts
+          ?.slice(replyPartsOffset.current)
+          .map((part) => (part.type === "text" ? part.text : ""))
+          .join("") || "";
 
-      const meta = message.metadata as { usage?: LanguageModelUsage } | undefined;
+      const meta = message.metadata as
+        | { usage?: LanguageModelUsage }
+        | undefined;
 
       const assistantMessage: Message = {
-        id: message.id,
+        // Not message.id: a continued reply shares the previous message's ID.
+        id: crypto.randomUUID(),
         role: "assistant",
         content: text,
         metadata: {
@@ -142,13 +158,15 @@ export function Conversation({ id }: ConversationProps) {
   const isLoading = status === "streaming" || status === "submitted";
 
   // Get the streaming assistant message text (only while actively streaming, not while submitted/waiting)
-  const streamingText = status === "streaming"
-    ? chatMessages
-        .filter((m) => m.role === "assistant")
-        .at(-1)
-        ?.parts?.map((part) => (part.type === "text" ? part.text : ""))
-        .join("") || ""
-    : null;
+  const streamingText =
+    status === "streaming"
+      ? chatMessages
+          .filter((m) => m.role === "assistant")
+          .at(-1)
+          ?.parts?.slice(replyPartsOffset.current)
+          .map((part) => (part.type === "text" ? part.text : ""))
+          .join("") || ""
+      : null;
 
   const handleCopyResponse = (content: Message["content"]) => {
     const textContent =
@@ -181,48 +199,59 @@ export function Conversation({ id }: ConversationProps) {
               {
                 id: Date.now().toString(),
                 role: "system" as const,
-                content: injectVarsIntoTemplate(
-                  systemPrompt,
-                  systemPromptVars,
-                ),
+                content: injectVarsIntoTemplate(systemPrompt, systemPromptVars),
               } as Message,
               ...currentConversation.messages,
             ]
           : currentConversation.messages;
 
-        const toUIMessage = (m: Message) => ({
+        if (messages.length === 0) return;
+
+        const toUIMessage = (m: Message): UIMessage => ({
           id: m.id || Date.now().toString(),
-          role: m.role as "system" | "user" | "assistant",
-          parts: [
-            {
-              type: "text" as const,
-              text: typeof m.content === "string" ? m.content : "",
-            },
-          ],
+          role: m.role,
+          parts:
+            typeof m.content === "string"
+              ? [{ type: "text", text: m.content }]
+              : m.content.map((part) =>
+                  part.type === "text"
+                    ? { type: "text", text: part.text }
+                    : part.type === "image"
+                      ? {
+                          type: "file",
+                          mediaType: part.mediaType ?? "image/png",
+                          url: `data:${part.mediaType ?? "image/png"};base64,${part.image}`,
+                        }
+                      : {
+                          type: "file",
+                          mediaType: part.mediaType,
+                          url: `data:${part.mediaType};base64,${part.data}`,
+                        },
+                ),
         });
 
-        const bodyOptions = {
+        // Cleared number inputs hold NaN, which JSON turns into null and the
+        // API rejects, so leave them out and let the server defaults apply.
+        const finiteOrUndefined = (value: number) =>
+          Number.isFinite(value) ? value : undefined;
+
+        // Submit the whole history as-is so the last message keeps its role
+        // and attachments, instead of being re-sent as a plain user text.
+        const uiMessages = messages.map(toUIMessage);
+        const lastUIMessage = uiMessages.at(-1)!;
+        replyPartsOffset.current =
+          lastUIMessage.role === "assistant" ? lastUIMessage.parts.length : 0;
+
+        setMessages(uiMessages);
+        sendMessage(undefined, {
           body: {
             provider: currentConversation.provider,
             model: currentConversation.model,
-            max_tokens: currentState.maxTokens,
-            temperature: currentState.temperature,
+            max_tokens: finiteOrUndefined(currentState.maxTokens),
+            temperature: finiteOrUndefined(currentState.temperature),
             reasoningEffort: currentConversation.reasoningEffort,
           },
-        };
-
-        // Set history (all except last), then send the last message
-        const history = messages.slice(0, -1);
-        const lastMessage = messages.at(-1);
-
-        setMessages(history.map(toUIMessage));
-
-        if (lastMessage) {
-          const text = typeof lastMessage.content === "string"
-            ? lastMessage.content
-            : "";
-          sendMessage({ text }, bodyOptions);
-        }
+        });
 
         requestStartTime.current = Date.now();
       }
@@ -232,8 +261,6 @@ export function Conversation({ id }: ConversationProps) {
   useEffect(() => {
     updateConversation(id, { isLoading });
   }, [id, updateConversation, isLoading]);
-
-
 
   return (
     <div
@@ -263,9 +290,7 @@ export function Conversation({ id }: ConversationProps) {
             <SelectTrigger
               className="w-max shrink-0 bg-input/25 px-2"
               aria-label="Pick a provider"
-              title={
-                isLoadingModels ? "Loading providers…" : "Pick a provider"
-              }
+              title={isLoadingModels ? "Loading providers…" : "Pick a provider"}
               disabled={isLoadingModels || providers.length === 0}
             />
             <SelectContent>
@@ -315,7 +340,9 @@ export function Conversation({ id }: ConversationProps) {
             <Select
               value={currentConversation.reasoningEffort}
               onValueChange={(value) =>
-                updateConversation(id, { reasoningEffort: value as ReasoningEffort })
+                updateConversation(id, {
+                  reasoningEffort: value as ReasoningEffort,
+                })
               }
             >
               <SelectTrigger className="w-max bg-input/25 text-xs">
